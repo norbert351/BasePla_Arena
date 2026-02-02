@@ -13,6 +13,9 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Poppins', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +60,23 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        game: {
+          bg: "hsl(var(--game-bg))",
+          empty: "hsl(var(--tile-empty))",
+        },
+        tile: {
+          2: "hsl(var(--tile-2))",
+          4: "hsl(var(--tile-4))",
+          8: "hsl(var(--tile-8))",
+          16: "hsl(var(--tile-16))",
+          32: "hsl(var(--tile-32))",
+          64: "hsl(var(--tile-64))",
+          128: "hsl(var(--tile-128))",
+          256: "hsl(var(--tile-256))",
+          512: "hsl(var(--tile-512))",
+          1024: "hsl(var(--tile-1024))",
+          2048: "hsl(var(--tile-2048))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,25 +85,39 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "tile-pop": {
+          "0%": { transform: "scale(0)", opacity: "0" },
+          "50%": { transform: "scale(1.1)" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
+        "tile-merge": {
+          "0%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.2)" },
+          "100%": { transform: "scale(1)" },
+        },
+        "slide-up": {
+          "0%": { transform: "translateY(10px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { boxShadow: "0 0 20px hsl(280, 80%, 55%, 0.4)" },
+          "50%": { boxShadow: "0 0 40px hsl(280, 80%, 55%, 0.6)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "tile-pop": "tile-pop 0.15s ease-out",
+        "tile-merge": "tile-merge 0.2s ease-out",
+        "slide-up": "slide-up 0.3s ease-out",
+        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
       },
     },
   },
