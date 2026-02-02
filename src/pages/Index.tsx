@@ -4,7 +4,7 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { ScoreBox } from '@/components/game/ScoreBox';
 import { WalletConnect } from '@/components/game/WalletConnect';
 import { GameOverModal } from '@/components/game/GameOverModal';
-import { PaymentModal } from '@/components/game/PaymentModal';
+import { PaymentModal, PaymentToken } from '@/components/game/PaymentModal';
 import { Leaderboard } from '@/components/Leaderboard';
 import { AdminDashboard } from '@/components/AdminDashboard';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { RotateCcw, Gamepad2, Trophy, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
-const GAME_FEE = '0.001';
+const GAME_FEE_ETH = '0.001';
+const GAME_FEE_USDC = '2.50';
+const FEE_COLLECTION_ADDRESS = '0xadf983e3d07d6abf344e1923f1d2164d8dffd816';
 
 const Index = () => {
   const {
@@ -31,7 +33,8 @@ const Index = () => {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
-  const [balance] = useState('0.1'); // Simulated balance
+  const [balanceETH] = useState('0.1'); // Simulated ETH balance
+  const [balanceUSDC] = useState('50.00'); // Simulated USDC balance
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleWalletConnect = useCallback(async (address: string) => {
@@ -65,7 +68,7 @@ const Index = () => {
     setSessionId(null);
   }, []);
 
-  const startNewGame = useCallback(async () => {
+  const startNewGame = useCallback(async (token: PaymentToken) => {
     if (!playerId) {
       toast.error('Please connect your wallet first');
       return;
@@ -74,14 +77,17 @@ const Index = () => {
     setIsProcessing(true);
     try {
       // Simulate payment (in real app, this would be a blockchain transaction)
+      // Payment would be sent to FEE_COLLECTION_ADDRESS
       await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const feeAmount = token === 'ETH' ? parseFloat(GAME_FEE_ETH) : parseFloat(GAME_FEE_USDC);
 
       // Create game session
       const { data: session, error } = await supabase
         .from('game_sessions')
         .insert({
           player_id: playerId,
-          fee_paid: parseFloat(GAME_FEE),
+          fee_paid: feeAmount,
         })
         .select('id')
         .single();
@@ -91,7 +97,7 @@ const Index = () => {
       setSessionId(session.id);
       resetGame();
       setShowPayment(false);
-      toast.success('Game started! Good luck!');
+      toast.success(`Paid ${token === 'ETH' ? GAME_FEE_ETH + ' ETH' : GAME_FEE_USDC + ' USDC'}. Good luck!`);
     } catch (error) {
       console.error('Failed to start game:', error);
       toast.error('Failed to start game');
@@ -192,7 +198,7 @@ const Index = () => {
               {/* Info Banner */}
               <div className="gradient-primary rounded-lg p-4 text-center text-primary-foreground">
                 <p className="text-sm font-medium">
-                  💰 Pay {GAME_FEE} ETH per game • Top 10 weekly players share 50% of fees!
+                  💰 Pay {GAME_FEE_ETH} ETH or {GAME_FEE_USDC} USDC per game • Top 10 weekly players share 50% of fees!
                 </p>
               </div>
 
@@ -235,9 +241,12 @@ const Index = () => {
         isOpen={showPayment}
         onClose={() => setShowPayment(false)}
         onPay={startNewGame}
-        fee={GAME_FEE}
-        balance={balance}
+        feeETH={GAME_FEE_ETH}
+        feeUSDC={GAME_FEE_USDC}
+        balanceETH={balanceETH}
+        balanceUSDC={balanceUSDC}
         isLoading={isProcessing}
+        feeAddress={FEE_COLLECTION_ADDRESS}
       />
     </div>
   );
