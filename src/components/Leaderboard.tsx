@@ -5,36 +5,42 @@ import { cn } from '@/lib/utils';
 
 interface LeaderboardEntry {
   rank: number;
+  displayName: string;
   wallet: string;
   score: number;
-  isTopTen: boolean;
+  isTopTwenty: boolean;
 }
 
 export const Leaderboard = () => {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
     queryFn: async () => {
-      // Get top 50 scores from game sessions
+      // Get top 50 scores from game sessions with player display names
       const { data, error } = await supabase
         .from('game_sessions')
         .select(`
           score,
           player_id,
-          players!inner(wallet_address)
+          players!inner(wallet_address, display_name)
         `)
         .order('score', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
       // Group by player and get highest score
-      const playerScores = new Map<string, { wallet: string; score: number }>();
+      const playerScores = new Map<string, { wallet: string; displayName: string; score: number }>();
       
       data?.forEach((session: any) => {
         const wallet = session.players.wallet_address;
+        const displayName = session.players.display_name;
         const existing = playerScores.get(wallet);
         if (!existing || session.score > existing.score) {
-          playerScores.set(wallet, { wallet, score: session.score });
+          playerScores.set(wallet, { 
+            wallet, 
+            displayName: displayName || shortenWallet(wallet),
+            score: session.score 
+          });
         }
       });
 
@@ -45,8 +51,9 @@ export const Leaderboard = () => {
         .map((entry, index) => ({
           rank: index + 1,
           wallet: entry.wallet,
+          displayName: entry.displayName,
           score: entry.score,
-          isTopTen: index < 10,
+          isTopTwenty: index < 20,
         }));
 
       return sorted;
@@ -74,14 +81,14 @@ export const Leaderboard = () => {
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="bg-card rounded-xl p-4 border border-border">
+      <div className="bg-card rounded-xl p-4 border border-border shadow-lg">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <Trophy className="h-5 w-5 text-accent" />
             Leaderboard
           </h2>
           <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">
-            Top 10 win 50% fees
+            Top 20 win 60% fees monthly
           </span>
         </div>
 
@@ -96,20 +103,27 @@ export const Leaderboard = () => {
                 key={entry.wallet}
                 className={cn(
                   'flex items-center justify-between p-3 rounded-lg transition-colors',
-                  entry.isTopTen
+                  entry.isTopTwenty
                     ? 'bg-primary/10 border border-primary/30'
                     : 'bg-secondary/50'
                 )}
               >
                 <div className="flex items-center gap-3">
                   {getRankIcon(entry.rank)}
-                  <span className="font-mono text-sm">
-                    {shortenWallet(entry.wallet)}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-sm">
+                      {entry.displayName}
+                    </span>
+                    {entry.displayName !== shortenWallet(entry.wallet) && (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {shortenWallet(entry.wallet)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span className={cn(
                   'font-bold',
-                  entry.isTopTen && 'text-accent'
+                  entry.isTopTwenty && 'text-accent'
                 )}>
                   {entry.score.toLocaleString()}
                 </span>
