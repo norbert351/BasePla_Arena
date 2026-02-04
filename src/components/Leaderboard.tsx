@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Trophy, Medal, Award, Loader2 } from 'lucide-react';
+import { Trophy, Medal, Award, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getBaseProfileUrl } from '@/lib/basename';
 
 interface LeaderboardEntry {
   rank: number;
@@ -47,7 +48,7 @@ export const Leaderboard = () => {
       // Convert to array and sort
       const sorted = Array.from(playerScores.values())
         .sort((a, b) => b.score - a.score)
-        .slice(0, 50)
+        .slice(0, 20)
         .map((entry, index) => ({
           rank: index + 1,
           wallet: entry.wallet,
@@ -69,6 +70,11 @@ export const Leaderboard = () => {
     if (rank === 2) return <Medal className="h-5 w-5 text-muted-foreground" />;
     if (rank === 3) return <Award className="h-5 w-5 text-primary" />;
     return <span className="w-5 text-center text-muted-foreground">{rank}</span>;
+  };
+
+  const openProfile = (entry: LeaderboardEntry) => {
+    const profileUrl = getBaseProfileUrl(entry.displayName.includes('.') ? entry.displayName : entry.wallet);
+    window.open(profileUrl, '_blank');
   };
 
   if (isLoading) {
@@ -99,20 +105,22 @@ export const Leaderboard = () => {
         ) : (
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {entries.map((entry) => (
-              <div
+              <button
                 key={entry.wallet}
+                onClick={() => openProfile(entry)}
                 className={cn(
-                  'flex items-center justify-between p-3 rounded-lg transition-colors',
+                  'w-full flex items-center justify-between p-3 rounded-lg transition-colors group text-left',
                   entry.isTopTwenty
-                    ? 'bg-primary/10 border border-primary/30'
-                    : 'bg-secondary/50'
+                    ? 'bg-primary/10 border border-primary/30 hover:bg-primary/20'
+                    : 'bg-secondary/50 hover:bg-secondary/80'
                 )}
               >
                 <div className="flex items-center gap-3">
                   {getRankIcon(entry.rank)}
                   <div className="flex flex-col">
-                    <span className="font-semibold text-sm">
+                    <span className="font-semibold text-sm flex items-center gap-1">
                       {entry.displayName}
+                      <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
                     </span>
                     {entry.displayName !== shortenWallet(entry.wallet) && (
                       <span className="font-mono text-xs text-muted-foreground">
@@ -127,7 +135,7 @@ export const Leaderboard = () => {
                 )}>
                   {entry.score.toLocaleString()}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         )}
