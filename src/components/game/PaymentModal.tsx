@@ -7,7 +7,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Coins, AlertCircle } from 'lucide-react';
+import { Coins, AlertCircle, CheckCircle } from 'lucide-react';
 
 export type PaymentToken = 'ETH' | 'USDC';
 
@@ -20,7 +20,6 @@ interface PaymentModalProps {
   balanceETH?: string;
   balanceUSDC?: string;
   isLoading?: boolean;
-  feeAddress: string;
 }
 
 export const PaymentModal = ({
@@ -32,7 +31,6 @@ export const PaymentModal = ({
   balanceETH = '0',
   balanceUSDC = '0',
   isLoading = false,
-  feeAddress,
 }: PaymentModalProps) => {
   const [selectedToken, setSelectedToken] = useState<PaymentToken>('ETH');
   
@@ -49,7 +47,7 @@ export const PaymentModal = ({
             Pay to Play
           </DialogTitle>
           <DialogDescription className="text-center">
-            Select your preferred payment token
+            Select your preferred payment token on Base
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center gap-4 py-4">
@@ -78,20 +76,21 @@ export const PaymentModal = ({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Your Balance:</span>
-              <span className="font-semibold">{balance} {selectedToken}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">{parseFloat(balance).toFixed(selectedToken === 'ETH' ? 6 : 2)} {selectedToken}</span>
+                {hasEnoughBalance ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Fee Collection Address */}
-          <div className="w-full p-3 rounded-lg bg-muted/30 border border-border">
-            <p className="text-xs text-muted-foreground mb-1">Fees sent to:</p>
-            <p className="text-xs font-mono text-foreground/80 break-all">{feeAddress}</p>
-          </div>
-
           {!hasEnoughBalance && (
-            <div className="flex items-center gap-2 text-destructive text-sm">
-              <AlertCircle className="h-4 w-4" />
-              <span>Insufficient {selectedToken} balance</span>
+            <div className="flex items-center gap-2 text-destructive text-sm bg-secondary p-3 rounded-lg w-full border border-destructive/30">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>Insufficient {selectedToken} balance. Please add funds to your wallet on Base network.</span>
             </div>
           )}
 

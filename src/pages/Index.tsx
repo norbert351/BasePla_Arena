@@ -10,18 +10,23 @@ import { AdminDashboard } from '@/components/AdminDashboard';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { RotateCcw, Gamepad2, Trophy, Shield } from 'lucide-react';
+import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
+import { RotateCcw, Gamepad2, Trophy, Shield, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Address } from 'viem';
 
 const GAME_FEE_ETH = '0.001';
 const GAME_FEE_USDC = '2.50';
-const FEE_COLLECTION_ADDRESS = '0xadf983e3d07d6abf344e1923f1d2164d8dffd816';
+
+// Creator wallet addresses that can access admin
+const ADMIN_WALLETS = [
+  '0xadf983e3d07d6abf344e1923f1d2164d8dffd816',
+].map(addr => addr.toLowerCase());
 
 const Index = () => {
   const {
     grid,
     score,
-    bestScore,
     gameOver,
     won,
     moveCount,
@@ -33,9 +38,17 @@ const Index = () => {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
-  const [balanceETH] = useState('0.1'); // Simulated ETH balance
-  const [balanceUSDC] = useState('50.00'); // Simulated USDC balance
+  const [balanceETH, setBalanceETH] = useState('0');
+  const [balanceUSDC, setBalanceUSDC] = useState('0');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasPaidForSession, setHasPaidForSession] = useState(false);
+
+  const isAdmin = walletAddress && ADMIN_WALLETS.includes(walletAddress.toLowerCase());
+
+  const handleBalanceUpdate = useCallback((ethBal: string, usdcBal: string) => {
+    setBalanceETH(ethBal);
+    setBalanceUSDC(usdcBal);
+  }, []);
 
   const handleWalletConnect = useCallback(async (address: string) => {
     setWalletAddress(address);
@@ -66,28 +79,36 @@ const Index = () => {
     setWalletAddress(null);
     setPlayerId(null);
     setSessionId(null);
+    setBalanceETH('0');
+    setBalanceUSDC('0');
+    setHasPaidForSession(false);
   }, []);
 
   const startNewGame = useCallback(async (token: PaymentToken) => {
-    if (!playerId) {
+    if (!playerId || !walletAddress) {
       toast.error('Please connect your wallet first');
       return;
     }
 
     setIsProcessing(true);
     try {
-      // Simulate payment (in real app, this would be a blockchain transaction)
-      // Payment would be sent to FEE_COLLECTION_ADDRESS
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Send actual blockchain payment
+      const feeAmount = token === 'ETH' ? GAME_FEE_ETH : GAME_FEE_USDC;
+      
+      toast.info(`Sending ${feeAmount} ${token}... Please confirm in your wallet.`);
+      
+      if (token === 'ETH') {
+        await sendETHPayment(walletAddress as Address, GAME_FEE_ETH);
+      } else {
+        await sendUSDCPayment(walletAddress as Address, GAME_FEE_USDC);
+      }
 
-      const feeAmount = token === 'ETH' ? parseFloat(GAME_FEE_ETH) : parseFloat(GAME_FEE_USDC);
-
-      // Create game session
+      // Create game session after successful payment
       const { data: session, error } = await supabase
         .from('game_sessions')
         .insert({
           player_id: playerId,
-          fee_paid: feeAmount,
+          fee_paid: parseFloat(feeAmount),
         })
         .select('id')
         .single();
@@ -95,16 +116,21 @@ const Index = () => {
       if (error) throw error;
 
       setSessionId(session.id);
+      setHasPaidForSession(true);
       resetGame();
       setShowPayment(false);
-      toast.success(`Paid ${token === 'ETH' ? GAME_FEE_ETH + ' ETH' : GAME_FEE_USDC + ' USDC'}. Good luck!`);
-    } catch (error) {
+      toast.success(`Payment confirmed! Good luck!`);
+    } catch (error: any) {
       console.error('Failed to start game:', error);
-      toast.error('Failed to start game');
+      if (error.message?.includes('rejected') || error.message?.includes('denied')) {
+        toast.error('Transaction cancelled');
+      } else {
+        toast.error(error.message || 'Failed to process payment');
+      }
     } finally {
       setIsProcessing(false);
     }
-  }, [playerId, resetGame]);
+  }, [playerId, walletAddress, resetGame]);
 
   const handlePlayAgain = useCallback(() => {
     if (walletAddress && playerId) {
@@ -125,6 +151,7 @@ const Index = () => {
           is_active: false,
         })
         .eq('id', sessionId);
+      setHasPaidForSession(false);
     }
   }, [sessionId, score]);
 
@@ -133,8 +160,11 @@ const Index = () => {
     handleGameEnd();
   }
 
+  // Check if user needs to pay to play
+  const needsPayment = walletAddress && !hasPaidForSession && !gameOver && !won;
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
       {/* Header */}
       <header className="py-6 px-4">
         <div className="max-w-4xl mx-auto text-center">
@@ -151,7 +181,7 @@ const Index = () => {
       <main className="px-4 pb-8">
         <div className="max-w-4xl mx-auto">
           <Tabs defaultValue="game" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-6 bg-secondary">
+            <TabsList className="grid w-full grid-cols-3 mb-6 bg-secondary/80 backdrop-blur-sm">
               <TabsTrigger value="game" className="flex items-center gap-2">
                 <Gamepad2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Game</span>
@@ -161,7 +191,7 @@ const Index = () => {
                 <span className="hidden sm:inline">Leaderboard</span>
               </TabsTrigger>
               <TabsTrigger value="admin" className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
+                {isAdmin ? <Shield className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                 <span className="hidden sm:inline">Admin</span>
               </TabsTrigger>
             </TabsList>
@@ -184,12 +214,14 @@ const Index = () => {
                       <WalletConnect
                         onConnect={handleWalletConnect}
                         onDisconnect={handleWalletDisconnect}
+                        onBalanceUpdate={handleBalanceUpdate}
                       />
                     </>
                   ) : (
                     <WalletConnect
                       onConnect={handleWalletConnect}
                       onDisconnect={handleWalletDisconnect}
+                      onBalanceUpdate={handleBalanceUpdate}
                     />
                   )}
                 </div>
@@ -198,12 +230,33 @@ const Index = () => {
               {/* Info Banner */}
               <div className="gradient-primary rounded-lg p-4 text-center text-primary-foreground">
                 <p className="text-sm font-medium">
-                  💰 Pay {GAME_FEE_ETH} ETH or {GAME_FEE_USDC} USDC per game • Top 10 weekly players share 50% of fees!
+                  💰 Pay {GAME_FEE_ETH} ETH or {GAME_FEE_USDC} USDC per game • Top 20 monthly players share 60% of fees!
                 </p>
               </div>
 
-              {/* Game Board */}
-              <GameBoard grid={grid} onMove={move} />
+              {/* Payment Required Overlay */}
+              {needsPayment && (
+                <div className="relative">
+                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-xl">
+                    <Lock className="h-12 w-12 text-primary mb-4" />
+                    <p className="text-lg font-semibold mb-4">Pay to Play</p>
+                    <Button
+                      onClick={() => setShowPayment(true)}
+                      className="gradient-gold text-accent-foreground"
+                    >
+                      Pay Entry Fee
+                    </Button>
+                  </div>
+                  <div className="opacity-30 pointer-events-none">
+                    <GameBoard grid={grid} onMove={move} />
+                  </div>
+                </div>
+              )}
+
+              {/* Game Board - Only show when paid */}
+              {(!needsPayment || !walletAddress) && (
+                <GameBoard grid={grid} onMove={move} />
+              )}
 
               {/* Instructions */}
               <p className="text-center text-muted-foreground text-sm">
@@ -223,7 +276,18 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="admin" className="animate-slide-up">
-              <AdminDashboard />
+              {isAdmin ? (
+                <AdminDashboard />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Lock className="h-16 w-16 text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Admin Access Required</h3>
+                  <p className="text-muted-foreground max-w-md">
+                    This section is restricted to authorized creators only. 
+                    Please connect with an admin wallet to access the dashboard.
+                  </p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>
@@ -246,7 +310,6 @@ const Index = () => {
         balanceETH={balanceETH}
         balanceUSDC={balanceUSDC}
         isLoading={isProcessing}
-        feeAddress={FEE_COLLECTION_ADDRESS}
       />
     </div>
   );
