@@ -1,18 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Wallet, RefreshCw } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Copy, Wallet, RefreshCw, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { getETHBalance, getUSDCBalance, switchToBaseNetwork } from '@/lib/blockchain';
+import { resolveBasename, getBaseProfileUrl, type BaseProfile } from '@/lib/basename';
 import type { Address } from 'viem';
 
 interface WalletConnectProps {
-  onConnect?: (address: string) => void;
+  onConnect?: (address: string, profile?: BaseProfile) => void;
   onDisconnect?: () => void;
   onBalanceUpdate?: (ethBalance: string, usdcBalance: string) => void;
 }
 
 export const WalletConnect = ({ onConnect, onDisconnect, onBalanceUpdate }: WalletConnectProps) => {
   const [address, setAddress] = useState<string | null>(null);
+  const [profile, setProfile] = useState<BaseProfile | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
@@ -32,14 +35,27 @@ export const WalletConnect = ({ onConnect, onDisconnect, onBalanceUpdate }: Wall
     }
   }, [onBalanceUpdate]);
 
+  const fetchProfile = useCallback(async (walletAddress: string) => {
+    try {
+      const baseProfile = await resolveBasename(walletAddress);
+      setProfile(baseProfile);
+      return baseProfile;
+    } catch (error) {
+      console.error('Failed to fetch Base profile:', error);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     const savedAddress = localStorage.getItem('wallet-address');
     if (savedAddress) {
       setAddress(savedAddress);
-      onConnect?.(savedAddress);
+      fetchProfile(savedAddress).then((baseProfile) => {
+        onConnect?.(savedAddress, baseProfile || undefined);
+      });
       fetchBalances(savedAddress);
     }
-  }, [onConnect, fetchBalances]);
+  }, [onConnect, fetchBalances, fetchProfile]);
 
   const connectWallet = async () => {
     setIsConnecting(true);
@@ -54,7 +70,11 @@ export const WalletConnect = ({ onConnect, onDisconnect, onBalanceUpdate }: Wall
         const walletAddress = accounts[0];
         setAddress(walletAddress);
         localStorage.setItem('wallet-address', walletAddress);
-        onConnect?.(walletAddress);
+        
+        // Fetch Base profile
+        const baseProfile = await fetchProfile(walletAddress);
+        onConnect?.(walletAddress, baseProfile || undefined);
+        
         await fetchBalances(walletAddress);
         toast.success('Wallet connected to Base network!');
       } else {
@@ -70,6 +90,7 @@ export const WalletConnect = ({ onConnect, onDisconnect, onBalanceUpdate }: Wall
 
   const disconnectWallet = () => {
     setAddress(null);
+    setProfile(null);
     localStorage.removeItem('wallet-address');
     onDisconnect?.();
     toast.success('Wallet disconnected');
@@ -93,6 +114,14 @@ export const WalletConnect = ({ onConnect, onDisconnect, onBalanceUpdate }: Wall
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
+  const openProfile = () => {
+    if (profile?.name) {
+      window.open(getBaseProfileUrl(profile.name), '_blank');
+    } else if (address) {
+      window.open(getBaseProfileUrl(address), '_blank');
+    }
+  };
+
   if (address) {
     return (
       <div className="flex flex-col items-center gap-2">
@@ -114,12 +143,29 @@ export const WalletConnect = ({ onConnect, onDisconnect, onBalanceUpdate }: Wall
             Logout
           </Button>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>Player: {shortenAddress(address)}</span>
-          <button onClick={copyAddress} className="hover:text-foreground transition-colors">
+        <button 
+          onClick={openProfile}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group"
+        >
+          {profile?.avatar && (
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={profile.avatar} alt={profile.name || 'Profile'} />
+              <AvatarFallback className="text-xs">
+                {(profile.name || address).slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          )}
+          <span className="font-medium">
+            {profile?.name || shortenAddress(address)}
+          </span>
+          <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <button 
+            onClick={(e) => { e.stopPropagation(); copyAddress(); }} 
+            className="hover:text-foreground transition-colors"
+          >
             <Copy className="h-4 w-4" />
           </button>
-        </div>
+        </button>
       </div>
     );
   }

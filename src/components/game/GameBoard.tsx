@@ -5,13 +5,16 @@ import { useRef, useEffect, useState } from 'react';
 interface GameBoardProps {
   grid: Grid;
   onMove: (direction: 'left' | 'right' | 'up' | 'down') => void;
+  disabled?: boolean;
 }
 
-export const GameBoard = ({ grid, onMove }: GameBoardProps) => {
+export const GameBoard = ({ grid, onMove, disabled = false }: GameBoardProps) => {
   const boardRef = useRef<HTMLDivElement>(null);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
+    if (disabled) return;
+    
     const board = boardRef.current;
     if (!board) return;
 
@@ -48,12 +51,12 @@ export const GameBoard = ({ grid, onMove }: GameBoardProps) => {
       board.removeEventListener('touchstart', handleTouchStart);
       board.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [touchStart, onMove]);
+  }, [touchStart, onMove, disabled]);
 
   return (
     <div
       ref={boardRef}
-      className="bg-game-bg p-3 md:p-4 rounded-xl w-full max-w-sm mx-auto"
+      className={`bg-game-bg p-3 md:p-4 rounded-xl w-full max-w-sm mx-auto ${disabled ? 'pointer-events-none' : ''}`}
     >
       <div className="grid grid-cols-4 gap-2 md:gap-3">
         {grid.flat().map((tile, index) => (

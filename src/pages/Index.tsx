@@ -15,12 +15,13 @@ import { RotateCcw, Gamepad2, Trophy, Shield, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
 
-const GAME_FEE_ETH = '0.001';
-const GAME_FEE_USDC = '2.50';
+const GAME_FEE_ETH = '0.0005';
+const GAME_FEE_USDC = '1.49';
 
 // Creator wallet addresses that can access admin
 const ADMIN_WALLETS = [
   '0xadf983e3d07d6abf344e1923f1d2164d8dffd816',
+  '0xf79f164e634b76815b80b60a85e1258eb21d631c',
 ].map(addr => addr.toLowerCase());
 
 const Index = () => {
@@ -230,16 +231,17 @@ const Index = () => {
               {/* Info Banner */}
               <div className="gradient-primary rounded-lg p-4 text-center text-primary-foreground">
                 <p className="text-sm font-medium">
-                  💰 Pay {GAME_FEE_ETH} ETH or {GAME_FEE_USDC} USDC per game • Top 20 monthly players share 60% of fees!
+                  💰 Pay ${GAME_FEE_USDC} per session (ETH or USDC) • Top 20 monthly players share 60% of fees!
                 </p>
               </div>
 
-              {/* Payment Required Overlay */}
-              {needsPayment && (
-                <div className="relative">
-                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-xl">
+              {/* Game Board - Always visible, disabled until paid */}
+              <div className="relative">
+                {needsPayment && (
+                  <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center rounded-xl">
                     <Lock className="h-12 w-12 text-primary mb-4" />
-                    <p className="text-lg font-semibold mb-4">Pay to Play</p>
+                    <p className="text-lg font-semibold mb-2">Pay to Play</p>
+                    <p className="text-sm text-muted-foreground mb-4">Unlock the game with ${GAME_FEE_USDC}</p>
                     <Button
                       onClick={() => setShowPayment(true)}
                       className="gradient-gold text-accent-foreground"
@@ -247,16 +249,9 @@ const Index = () => {
                       Pay Entry Fee
                     </Button>
                   </div>
-                  <div className="opacity-30 pointer-events-none">
-                    <GameBoard grid={grid} onMove={move} />
-                  </div>
-                </div>
-              )}
-
-              {/* Game Board - Only show when paid */}
-              {(!needsPayment || !walletAddress) && (
-                <GameBoard grid={grid} onMove={move} />
-              )}
+                )}
+                <GameBoard grid={grid} onMove={move} disabled={!!needsPayment} />
+              </div>
 
               {/* Instructions */}
               <p className="text-center text-muted-foreground text-sm">
