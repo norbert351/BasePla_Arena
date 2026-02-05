@@ -14,6 +14,7 @@ import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
 import { RotateCcw, Gamepad2, Trophy, Shield, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
+import logo2048 from '@/assets/logo-2048.png';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -199,17 +200,22 @@ const Index = () => {
     }
   }, [gameOver, won, sessionId, handleGameEnd]);
 
-  // Check if user needs to pay to play
+  // Determine if play is blocked - must connect wallet AND pay
+  const needsWalletConnection = !walletAddress;
   const needsPayment = walletAddress && !hasPaidForSession && !gameOver && !won;
+  const isPlayBlocked = needsWalletConnection || needsPayment;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
       {/* Header */}
       <header className="py-6 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-5xl md:text-7xl font-black gradient-title drop-shadow-lg">
-            2048
-          </h1>
+          <div className="flex items-center justify-center gap-3 mb-1">
+            <img src={logo2048} alt="2048 on BASE" className="h-16 w-16 rounded-xl" />
+            <h1 className="text-5xl md:text-7xl font-black gradient-title drop-shadow-lg">
+              2048
+            </h1>
+          </div>
           <p className="text-lg font-semibold text-primary mt-1">
             on BASE
           </p>
@@ -273,22 +279,36 @@ const Index = () => {
                 </p>
               </div>
 
-              {/* Game Board - Always visible, disabled until paid */}
+              {/* Game Board - Always visible, disabled until wallet connected and paid */}
               <div className="relative">
-                {needsPayment && (
+                {isPlayBlocked && (
                   <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center rounded-xl">
                     <Lock className="h-12 w-12 text-primary mb-4" />
-                    <p className="text-lg font-semibold mb-2">Pay to Play</p>
-                    <p className="text-sm text-muted-foreground mb-4">Unlock the game with ${GAME_FEE_USDC}</p>
-                    <Button
-                      onClick={() => setShowPayment(true)}
-                      className="gradient-gold text-accent-foreground"
-                    >
-                      Pay Entry Fee
-                    </Button>
+                    {needsWalletConnection ? (
+                      <>
+                        <p className="text-lg font-semibold mb-2">Connect Wallet to Play</p>
+                        <p className="text-sm text-muted-foreground mb-4">Connect your Base wallet to start playing</p>
+                        <WalletConnect
+                          onConnect={handleWalletConnect}
+                          onDisconnect={handleWalletDisconnect}
+                          onBalanceUpdate={handleBalanceUpdate}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-lg font-semibold mb-2">Pay to Play</p>
+                        <p className="text-sm text-muted-foreground mb-4">Unlock the game with ${GAME_FEE_USDC}</p>
+                        <Button
+                          onClick={() => setShowPayment(true)}
+                          className="gradient-gold text-accent-foreground"
+                        >
+                          Pay Entry Fee
+                        </Button>
+                      </>
+                    )}
                   </div>
                 )}
-                <GameBoard grid={grid} onMove={move} disabled={!!needsPayment} />
+                <GameBoard grid={grid} onMove={move} disabled={!!isPlayBlocked} />
               </div>
 
               {/* Instructions */}
