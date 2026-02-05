@@ -12,14 +12,14 @@
     "splashImageUrl": "https://mini-2048-base.vercel.app/splash-2048.png",
     "splashBackgroundColor": "#0052FF",
     "subtitle": "Play to Earn on Base",
-    "description": "Classic 2048 puzzle game on Base blockchain. Pay $1.49 per session, compete for top 20 monthly rewards sharing 60% of fees!",
+    "description": "Classic 2048 puzzle game on Base blockchain. Pay 1.49 USDC per session and compete for top 20 monthly rewards sharing 60 percent of fees",
     "screenshotUrls": [],
     "primaryCategory": "games",
     "tags": ["games", "blockchain", "base", "puzzle", "crypto"],
     "heroImageUrl": "https://mini-2048-base.vercel.app/hero-2048.png",
     "tagline": "Puzzle Game with Rewards",
     "ogTitle": "2048 on BASE",
-    "ogDescription": "Classic 2048 puzzle game on Base blockchain. Pay $1.49 per session, compete for monthly rewards!",
+    "ogDescription": "Classic 2048 puzzle game on Base blockchain. Compete for monthly rewards",
     "ogImageUrl": "https://mini-2048-base.vercel.app/hero-2048.png",
     "noindex": false
   }
