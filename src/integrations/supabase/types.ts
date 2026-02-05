@@ -23,6 +23,8 @@ export type Database = {
           player_id: string
           score: number
           started_at: string
+          token_type: string | null
+          tx_hash: string | null
         }
         Insert: {
           ended_at?: string | null
@@ -32,6 +34,8 @@ export type Database = {
           player_id: string
           score?: number
           started_at?: string
+          token_type?: string | null
+          tx_hash?: string | null
         }
         Update: {
           ended_at?: string | null
@@ -41,6 +45,8 @@ export type Database = {
           player_id?: string
           score?: number
           started_at?: string
+          token_type?: string | null
+          tx_hash?: string | null
         }
         Relationships: [
           {
