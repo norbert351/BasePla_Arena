@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { use2048 } from '@/hooks/use2048';
 import { GameBoard } from '@/components/game/GameBoard';
 import { ScoreBox } from '@/components/game/ScoreBox';
@@ -14,6 +14,8 @@ import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
 import { RotateCcw, Gamepad2, Trophy, Shield, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const GAME_FEE_ETH = '0.0005';
 const GAME_FEE_USDC = '1.49';
@@ -54,26 +56,17 @@ const Index = () => {
   const handleWalletConnect = useCallback(async (address: string) => {
     setWalletAddress(address);
     
-    // Check if player exists or create new
+    // Check if player exists (read-only, allowed by RLS)
     const { data: existingPlayer } = await supabase
       .from('players')
       .select('id')
-      .eq('wallet_address', address)
+      .eq('wallet_address', address.toLowerCase())
       .single();
 
     if (existingPlayer) {
       setPlayerId(existingPlayer.id);
-    } else {
-      const { data: newPlayer, error } = await supabase
-        .from('players')
-        .insert({ wallet_address: address })
-        .select('id')
-        .single();
-
-      if (!error && newPlayer) {
-        setPlayerId(newPlayer.id);
-      }
     }
+    // Player creation now happens via edge function during payment
   }, []);
 
   const handleWalletDisconnect = useCallback(() => {
@@ -86,7 +79,7 @@ const Index = () => {
   }, []);
 
   const startNewGame = useCallback(async (token: PaymentToken) => {
-    if (!playerId || !walletAddress) {
+    if (!walletAddress) {
       toast.error('Please connect your wallet first');
       return;
     }
@@ -98,29 +91,41 @@ const Index = () => {
       
       toast.info(`Sending ${feeAmount} ${token}... Please confirm in your wallet.`);
       
+      let txHash: string;
       if (token === 'ETH') {
-        await sendETHPayment(walletAddress as Address, GAME_FEE_ETH);
+        txHash = await sendETHPayment(walletAddress as Address, GAME_FEE_ETH);
       } else {
-        await sendUSDCPayment(walletAddress as Address, GAME_FEE_USDC);
+        txHash = await sendUSDCPayment(walletAddress as Address, GAME_FEE_USDC);
       }
 
-      // Create game session after successful payment
-      const { data: session, error } = await supabase
-        .from('game_sessions')
-        .insert({
-          player_id: playerId,
-          fee_paid: parseFloat(feeAmount),
-        })
-        .select('id')
-        .single();
+      toast.info('Payment confirmed! Creating game session...');
 
-      if (error) throw error;
+      // Create game session via edge function (server-side validation)
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/create-game-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          wallet_address: walletAddress,
+          tx_hash: txHash,
+          token_type: token,
+          fee_amount: feeAmount,
+        }),
+      });
 
-      setSessionId(session.id);
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create game session');
+      }
+
+      setSessionId(result.session_id);
+      setPlayerId(result.player_id);
       setHasPaidForSession(true);
       resetGame();
       setShowPayment(false);
-      toast.success(`Payment confirmed! Good luck!`);
+      toast.success(`Game started! Good luck!`);
     } catch (error: any) {
       console.error('Failed to start game:', error);
       if (error.message?.includes('rejected') || error.message?.includes('denied')) {
@@ -131,7 +136,7 @@ const Index = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [playerId, walletAddress, resetGame]);
+  }, [walletAddress, resetGame]);
 
   const handlePlayAgain = useCallback(() => {
     if (walletAddress && playerId) {
@@ -141,25 +146,58 @@ const Index = () => {
     }
   }, [walletAddress, playerId, resetGame]);
 
-  // Save score when game ends
+  // Track previous score to detect changes
+  const prevScoreRef = useRef(score);
+  
+  // Save score when game ends via edge function
   const handleGameEnd = useCallback(async () => {
-    if (sessionId && score > 0) {
-      await supabase
-        .from('game_sessions')
-        .update({
-          score,
-          ended_at: new Date().toISOString(),
-          is_active: false,
-        })
-        .eq('id', sessionId);
+    if (sessionId && walletAddress && score > 0) {
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            session_id: sessionId,
+            wallet_address: walletAddress,
+            score: score,
+            end_game: true,
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to save score:', error);
+      }
       setHasPaidForSession(false);
     }
-  }, [sessionId, score]);
+  }, [sessionId, walletAddress, score]);
+
+  // Update score periodically during gameplay (every significant score increase)
+  useEffect(() => {
+    if (sessionId && walletAddress && hasPaidForSession && score > prevScoreRef.current + 500) {
+      prevScoreRef.current = score;
+      // Save intermediate score
+      fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          wallet_address: walletAddress,
+          score: score,
+          end_game: false,
+        }),
+      }).catch(console.error);
+    }
+  }, [sessionId, walletAddress, hasPaidForSession, score]);
 
   // Trigger save on game over
-  if ((gameOver || won) && sessionId) {
-    handleGameEnd();
-  }
+  useEffect(() => {
+    if ((gameOver || won) && sessionId) {
+      handleGameEnd();
+    }
+  }, [gameOver, won, sessionId, handleGameEnd]);
 
   // Check if user needs to pay to play
   const needsPayment = walletAddress && !hasPaidForSession && !gameOver && !won;
