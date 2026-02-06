@@ -9,6 +9,7 @@
     "name": "2048 on BASE",
     "homeUrl": "https://mini-2048-base.vercel.app",
     "iconUrl": "https://mini-2048-base.vercel.app/logo-2048.png",
+    "imageUrl": "https://mini-2048-base.vercel.app/hero-2048.png",
     "splashImageUrl": "https://mini-2048-base.vercel.app/splash-2048.png",
     "splashBackgroundColor": "#0052FF",
     "subtitle": "Play to Earn on Base",
