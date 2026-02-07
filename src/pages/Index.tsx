@@ -20,12 +20,16 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const GAME_FEE_ETH = '0.0005';
 const GAME_FEE_USDC = '1.49';
+const CREATOR_FEE_ETH = '0.0001'; // $0.1 for creators (sign-only verification)
 
-// Creator wallet addresses that can access admin
-const ADMIN_WALLETS = [
+// Creator wallet addresses that can access admin AND pay reduced fee
+const CREATOR_WALLETS = [
   '0xadf983e3d07d6abf344e1923f1d2164d8dffd816',
   '0xf79f164e634b76815b80b60a85e1258eb21d631c',
 ].map(addr => addr.toLowerCase());
+
+const isCreatorWallet = (address: string | null) => 
+  address && CREATOR_WALLETS.includes(address.toLowerCase());
 
 const Index = () => {
   const {
@@ -47,7 +51,8 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasPaidForSession, setHasPaidForSession] = useState(false);
 
-  const isAdmin = walletAddress && ADMIN_WALLETS.includes(walletAddress.toLowerCase());
+  const isAdmin = isCreatorWallet(walletAddress);
+  const isCreator = isCreatorWallet(walletAddress);
 
   const handleBalanceUpdate = useCallback((ethBal: string, usdcBal: string) => {
     setBalanceETH(ethBal);
@@ -87,16 +92,21 @@ const Index = () => {
 
     setIsProcessing(true);
     try {
-      // Send actual blockchain payment
-      const feeAmount = token === 'ETH' ? GAME_FEE_ETH : GAME_FEE_USDC;
+      // Creator wallets only pay reduced verification fee in ETH
+      const isCreatorPayment = isCreator;
+      const feeAmount = isCreatorPayment ? CREATOR_FEE_ETH : (token === 'ETH' ? GAME_FEE_ETH : GAME_FEE_USDC);
+      const paymentToken = isCreatorPayment ? 'ETH' : token;
       
-      toast.info(`Sending ${feeAmount} ${token}... Please confirm in your wallet.`);
+      toast.info(isCreatorPayment 
+        ? `Creator verification: Sending ${feeAmount} ETH... Please sign in your wallet.`
+        : `Sending ${feeAmount} ${paymentToken}... Please confirm in your wallet.`
+      );
       
       let txHash: string;
-      if (token === 'ETH') {
-        txHash = await sendETHPayment(walletAddress as Address, GAME_FEE_ETH);
+      if (paymentToken === 'ETH') {
+        txHash = await sendETHPayment(walletAddress as Address, feeAmount);
       } else {
-        txHash = await sendUSDCPayment(walletAddress as Address, GAME_FEE_USDC);
+        txHash = await sendUSDCPayment(walletAddress as Address, feeAmount);
       }
 
       toast.info('Payment confirmed! Creating game session...');
@@ -110,8 +120,9 @@ const Index = () => {
         body: JSON.stringify({
           wallet_address: walletAddress,
           tx_hash: txHash,
-          token_type: token,
+          token_type: paymentToken,
           fee_amount: feeAmount,
+          is_creator: isCreatorPayment,
         }),
       });
 
@@ -126,18 +137,18 @@ const Index = () => {
       setHasPaidForSession(true);
       resetGame();
       setShowPayment(false);
-      toast.success(`Game started! Good luck!`);
+      toast.success(isCreatorPayment ? 'Creator verified! Game started!' : 'Game started! Good luck!');
     } catch (error: any) {
       console.error('Failed to start game:', error);
-      if (error.message?.includes('rejected') || error.message?.includes('denied')) {
-        toast.error('Transaction cancelled');
+      if (error.message?.includes('rejected') || error.message?.includes('denied') || error.message?.includes('not been authorized')) {
+        toast.error('Transaction cancelled or not authorized');
       } else {
         toast.error(error.message || 'Failed to process payment');
       }
     } finally {
       setIsProcessing(false);
     }
-  }, [walletAddress, resetGame]);
+  }, [walletAddress, isCreator, resetGame]);
 
   const handlePlayAgain = useCallback(() => {
     if (walletAddress && playerId) {
@@ -358,11 +369,12 @@ const Index = () => {
         isOpen={showPayment}
         onClose={() => setShowPayment(false)}
         onPay={startNewGame}
-        feeETH={GAME_FEE_ETH}
+        feeETH={isCreator ? CREATOR_FEE_ETH : GAME_FEE_ETH}
         feeUSDC={GAME_FEE_USDC}
         balanceETH={balanceETH}
         balanceUSDC={balanceUSDC}
         isLoading={isProcessing}
+        isCreator={isCreator}
       />
     </div>
   );

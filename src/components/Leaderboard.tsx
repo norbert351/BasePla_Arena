@@ -4,12 +4,19 @@ import { Trophy, Medal, Award, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getBaseProfileUrl } from '@/lib/basename';
 
+// Creator wallets to display with badge
+const CREATOR_WALLETS = [
+  '0xadf983e3d07d6abf344e1923f1d2164d8dffd816',
+  '0xf79f164e634b76815b80b60a85e1258eb21d631c',
+].map(addr => addr.toLowerCase());
+
 interface LeaderboardEntry {
   rank: number;
   displayName: string;
   wallet: string;
   score: number;
   isTopTwenty: boolean;
+  isCreator: boolean;
 }
 
 export const Leaderboard = () => {
@@ -55,6 +62,7 @@ export const Leaderboard = () => {
           displayName: entry.displayName,
           score: entry.score,
           isTopTwenty: index < 20,
+          isCreator: CREATOR_WALLETS.includes(entry.wallet.toLowerCase()),
         }));
 
       return sorted;
@@ -120,6 +128,9 @@ export const Leaderboard = () => {
                   <div className="flex flex-col">
                     <span className="font-semibold text-sm flex items-center gap-1">
                       {entry.displayName}
+                      {entry.isCreator && (
+                        <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">👑 Creator</span>
+                      )}
                       <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
                     </span>
                     {entry.displayName !== shortenWallet(entry.wallet) && (

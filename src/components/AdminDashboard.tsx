@@ -1,9 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Gamepad2, Coins, Trophy, Loader2 } from 'lucide-react';
+import { Users, Gamepad2, Coins, Trophy, Loader2, Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 export const AdminDashboard = () => {
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+
+  const copyToClipboard = (address: string) => {
+    navigator.clipboard.writeText(address);
+    setCopiedAddress(address);
+    toast.success('Wallet address copied!');
+    setTimeout(() => setCopiedAddress(null), 2000);
+  };
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
@@ -108,10 +120,24 @@ export const AdminDashboard = () => {
                   key={player.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
                 >
-                  <span className="font-mono text-sm">{player.wallet_address}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(player.created_at).toLocaleDateString()}
-                  </span>
+                  <span className="font-mono text-sm flex-1 truncate mr-2">{player.wallet_address}</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(player.wallet_address)}
+                      className="h-8 w-8 p-0 hover:bg-primary/20"
+                    >
+                      {copiedAddress === player.wallet_address ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(player.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
