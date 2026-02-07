@@ -411,6 +411,7 @@ const Index = () => {
         score={score}
         won={won}
         onPlayAgain={handlePlayAgain}
+        onClose={handlePlayAgain}
       />
 
       <PaymentModal

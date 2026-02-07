@@ -38,11 +38,9 @@ export const GameTile = ({ tile }: GameTileProps) => {
   return (
     <div
       className={cn(
-        'aspect-square rounded-lg flex items-center justify-center font-bold tile-shadow transition-all duration-100',
+        'aspect-square rounded-lg flex items-center justify-center font-bold tile-shadow',
         getTileStyles(tile.value),
-        getFontSize(tile.value),
-        tile.isNew && 'animate-tile-pop',
-        tile.isMerged && 'animate-tile-merge'
+        getFontSize(tile.value)
       )}
     >
       {tile.value}
