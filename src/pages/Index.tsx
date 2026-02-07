@@ -383,6 +383,24 @@ const Index = () => {
         </div>
       </main>
 
+      {/* Footer */}
+      <footer className="py-6 px-4 border-t border-border/50">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-sm text-muted-foreground">
+            Built by{' '}
+            <a
+              href="https://x.com/Zubby_crypt"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline font-medium"
+            >
+              @Zubby_crypt
+            </a>
+            {' '}• Follow for updates
+          </p>
+        </div>
+      </footer>
+
       {/* Modals */}
       <GameOverModal
         isOpen={gameOver || (won && !gameOver)}
