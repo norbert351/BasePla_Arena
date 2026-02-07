@@ -43,6 +43,42 @@ export const getWalletClient = () => {
   });
 };
 
+type Eip1193Provider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
+const getEip1193Provider = (): Eip1193Provider => {
+  if (typeof window === 'undefined' || !(window as any).ethereum?.request) {
+    throw new Error('No wallet found');
+  }
+  return (window as any).ethereum as Eip1193Provider;
+};
+
+/**
+ * Ensure the dapp is authorized for the currently selected wallet account.
+ * In some in-app wallets (e.g. embedded browsers), localStorage can get out of sync
+ * with the wallet’s active account, producing “not authorized” errors.
+ */
+const ensureAuthorizedAccount = async (expected?: Address): Promise<Address> => {
+  const provider = getEip1193Provider();
+
+  let accounts = (await provider.request({ method: 'eth_accounts' })) as unknown;
+  if (!Array.isArray(accounts) || accounts.length === 0) {
+    accounts = (await provider.request({ method: 'eth_requestAccounts' })) as unknown;
+  }
+
+  const active = Array.isArray(accounts) && typeof accounts[0] === 'string' ? (accounts[0] as string) : null;
+  if (!active) {
+    throw new Error('Wallet not connected');
+  }
+
+  if (expected && active.toLowerCase() !== expected.toLowerCase()) {
+    throw new Error('Wallet account changed. Please reconnect your wallet.');
+  }
+
+  return active as Address;
+};
+
 export const getETHBalance = async (address: Address): Promise<string> => {
   try {
     const client = getPublicClient();
@@ -76,13 +112,17 @@ export const getUSDCBalance = async (address: Address): Promise<string> => {
 export const sendETHPayment = async (fromAddress: Address, amount: string): Promise<Hex> => {
   if (!window.ethereum) throw new Error('No wallet found');
 
+  // Ensure the wallet is on Base and that the selected account is authorized.
+  await switchToBaseNetwork();
+  const from = await ensureAuthorizedAccount(fromAddress);
+
   try {
     // EIP-1193 providers return a single tx hash string for eth_sendTransaction.
     const txHash = (await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [
         {
-          from: fromAddress,
+          from,
           to: FEE_COLLECTION_ADDRESS,
           value: `0x${parseEther(amount).toString(16)}`,
         },
@@ -110,6 +150,10 @@ export const sendETHPayment = async (fromAddress: Address, amount: string): Prom
 export const sendUSDCPayment = async (fromAddress: Address, amount: string): Promise<Hex> => {
   if (!window.ethereum) throw new Error('No wallet found');
 
+  // Ensure the wallet is on Base and that the selected account is authorized.
+  await switchToBaseNetwork();
+  const from = await ensureAuthorizedAccount(fromAddress);
+
   // USDC has 6 decimals
   const amountInUnits = parseUnits(amount, 6);
 
@@ -123,7 +167,7 @@ export const sendUSDCPayment = async (fromAddress: Address, amount: string): Pro
       method: 'eth_sendTransaction',
       params: [
         {
-          from: fromAddress,
+          from,
           to: USDC_ADDRESS,
           data: transferData,
         },
