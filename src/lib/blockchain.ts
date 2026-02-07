@@ -75,47 +75,75 @@ export const getUSDCBalance = async (address: Address): Promise<string> => {
 
 export const sendETHPayment = async (fromAddress: Address, amount: string): Promise<Hex> => {
   if (!window.ethereum) throw new Error('No wallet found');
-  
-  // Use raw ethereum request for better compatibility
-  const txHash = await window.ethereum.request({
-    method: 'eth_sendTransaction',
-    params: [{
-      from: fromAddress,
-      to: FEE_COLLECTION_ADDRESS,
-      value: `0x${parseEther(amount).toString(16)}`,
-    }],
-  });
-  
-  // Wait for confirmation
-  const publicClient = getPublicClient();
-  await publicClient.waitForTransactionReceipt({ hash: txHash[0] as Hex || txHash as unknown as Hex });
-  
-  return (txHash[0] || txHash) as Hex;
+
+  try {
+    // EIP-1193 providers return a single tx hash string for eth_sendTransaction.
+    const txHash = (await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [
+        {
+          from: fromAddress,
+          to: FEE_COLLECTION_ADDRESS,
+          value: `0x${parseEther(amount).toString(16)}`,
+        },
+      ],
+    })) as unknown;
+
+    if (typeof txHash !== 'string' || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+      // Prevent viem from calling RPC methods with an invalid hash (e.g. "0")
+      throw new Error('Transaction was cancelled or did not return a valid hash');
+    }
+
+    const publicClient = getPublicClient();
+    await publicClient.waitForTransactionReceipt({ hash: txHash as Hex });
+
+    return txHash as Hex;
+  } catch (error: any) {
+    // Normalize common wallet rejection errors
+    if (error?.code === 4001) {
+      throw new Error('User rejected the transaction');
+    }
+    throw error;
+  }
 };
 
 export const sendUSDCPayment = async (fromAddress: Address, amount: string): Promise<Hex> => {
   if (!window.ethereum) throw new Error('No wallet found');
-  
+
   // USDC has 6 decimals
   const amountInUnits = parseUnits(amount, 6);
-  
+
   // Encode the transfer function call
-  const transferData = `0xa9059cbb000000000000000000000000${FEE_COLLECTION_ADDRESS.slice(2)}${amountInUnits.toString(16).padStart(64, '0')}` as Hex;
-  
-  const txHash = await window.ethereum.request({
-    method: 'eth_sendTransaction',
-    params: [{
-      from: fromAddress,
-      to: USDC_ADDRESS,
-      data: transferData,
-    }],
-  });
-  
-  // Wait for confirmation
-  const publicClient = getPublicClient();
-  await publicClient.waitForTransactionReceipt({ hash: txHash[0] as Hex || txHash as unknown as Hex });
-  
-  return (txHash[0] || txHash) as Hex;
+  const transferData = `0xa9059cbb000000000000000000000000${FEE_COLLECTION_ADDRESS.slice(2)}${amountInUnits
+    .toString(16)
+    .padStart(64, '0')}` as Hex;
+
+  try {
+    const txHash = (await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [
+        {
+          from: fromAddress,
+          to: USDC_ADDRESS,
+          data: transferData,
+        },
+      ],
+    })) as unknown;
+
+    if (typeof txHash !== 'string' || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+      throw new Error('Transaction was cancelled or did not return a valid hash');
+    }
+
+    const publicClient = getPublicClient();
+    await publicClient.waitForTransactionReceipt({ hash: txHash as Hex });
+
+    return txHash as Hex;
+  } catch (error: any) {
+    if (error?.code === 4001) {
+      throw new Error('User rejected the transaction');
+    }
+    throw error;
+  }
 };
 
 export const switchToBaseNetwork = async (): Promise<void> => {
