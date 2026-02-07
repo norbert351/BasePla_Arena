@@ -166,7 +166,11 @@ const Index = () => {
       toast.success(isCreatorPayment ? 'Creator verified! Game started!' : 'Game started! Good luck!');
     } catch (error: any) {
       console.error('Failed to start game:', error);
-      if (error.message?.includes('rejected') || error.message?.includes('denied') || error.message?.includes('not been authorized')) {
+      const msg = String(error?.message || '').toLowerCase();
+
+      if (msg.includes('reconnect your wallet') || msg.includes('account changed')) {
+        toast.error('Wallet account changed — please disconnect and reconnect, then try again.');
+      } else if (msg.includes('rejected') || msg.includes('denied') || msg.includes('not been authorized') || msg.includes('not authorized')) {
         toast.error('Transaction cancelled or not authorized');
       } else {
         toast.error(error.message || 'Failed to process payment');
@@ -174,7 +178,7 @@ const Index = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [walletAddress, isCreator, resetGame]);
+  }, [walletAddress, isCreator, dynamicEthFee, resetGame]);
 
   const handlePlayAgain = useCallback(() => {
     if (walletAddress && playerId) {

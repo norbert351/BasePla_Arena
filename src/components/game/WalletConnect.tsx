@@ -57,6 +57,49 @@ export const WalletConnect = ({ onConnect, onDisconnect, onBalanceUpdate }: Wall
     }
   }, [onConnect, fetchBalances, fetchProfile]);
 
+  // Keep app state in sync with the wallet (important for in-app browsers)
+  useEffect(() => {
+    const eth = window.ethereum as any;
+    if (!eth?.on) return;
+
+    const handleAccountsChanged = (accounts: unknown) => {
+      const accs = Array.isArray(accounts) ? (accounts as unknown[]) : [];
+      const next = typeof accs[0] === 'string' ? (accs[0] as string) : null;
+
+      if (!next) {
+        setAddress(null);
+        setProfile(null);
+        localStorage.removeItem('wallet-address');
+        onBalanceUpdate?.('0', '0');
+        onDisconnect?.();
+        toast.info('Wallet disconnected');
+        return;
+      }
+
+      setAddress(next);
+      localStorage.setItem('wallet-address', next);
+
+      fetchProfile(next).then((baseProfile) => {
+        onConnect?.(next, baseProfile || undefined);
+      });
+      fetchBalances(next);
+
+      toast.info('Wallet account updated');
+    };
+
+    const handleChainChanged = () => {
+      if (address) fetchBalances(address);
+    };
+
+    eth.on('accountsChanged', handleAccountsChanged);
+    eth.on('chainChanged', handleChainChanged);
+
+    return () => {
+      eth.removeListener?.('accountsChanged', handleAccountsChanged);
+      eth.removeListener?.('chainChanged', handleChainChanged);
+    };
+  }, [address, fetchBalances, fetchProfile, onConnect, onDisconnect, onBalanceUpdate]);
+
   const connectWallet = async () => {
     setIsConnecting(true);
     try {
@@ -185,7 +228,9 @@ export const WalletConnect = ({ onConnect, onDisconnect, onBalanceUpdate }: Wall
 declare global {
   interface Window {
     ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<string[]>;
+      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      on?: (event: string, listener: (...args: any[]) => void) => void;
+      removeListener?: (event: string, listener: (...args: any[]) => void) => void;
     };
   }
 }
