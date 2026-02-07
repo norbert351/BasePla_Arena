@@ -13,12 +13,23 @@ interface GameOverModalProps {
   score: number;
   won: boolean;
   onPlayAgain: () => void;
+  onClose?: () => void;
 }
 
-export const GameOverModal = ({ isOpen, score, won, onPlayAgain }: GameOverModalProps) => {
+export const GameOverModal = ({ isOpen, score, won, onPlayAgain, onClose }: GameOverModalProps) => {
+  const handleOpenChange = (open: boolean) => {
+    if (!open && onClose) {
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={isOpen}>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent 
+        className="sm:max-w-md bg-card border-border"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
             <Trophy className={won ? 'text-accent' : 'text-muted-foreground'} />
@@ -36,7 +47,10 @@ export const GameOverModal = ({ isOpen, score, won, onPlayAgain }: GameOverModal
             <p className="text-4xl font-bold gradient-title">{score.toLocaleString()}</p>
           </div>
           <Button
-            onClick={onPlayAgain}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlayAgain();
+            }}
             className="gradient-primary text-primary-foreground glow-primary hover:opacity-90"
           >
             <RotateCcw className="mr-2 h-4 w-4" />
