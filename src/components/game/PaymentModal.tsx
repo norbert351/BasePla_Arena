@@ -21,6 +21,7 @@ interface PaymentModalProps {
   balanceUSDC?: string;
   isLoading?: boolean;
   isCreator?: boolean;
+  ethPriceUsd?: number;
 }
 
 export const PaymentModal = ({
@@ -33,6 +34,7 @@ export const PaymentModal = ({
   balanceUSDC = '0',
   isLoading = false,
   isCreator = false,
+  ethPriceUsd,
 }: PaymentModalProps) => {
   // For creators, force ETH selection and hide USDC option
   const [selectedToken, setSelectedToken] = useState<PaymentToken>('ETH');
@@ -87,14 +89,20 @@ export const PaymentModal = ({
           <div className="w-full p-4 rounded-lg bg-secondary/50 border border-border">
             <div className="flex justify-between items-center mb-2">
               <span className="text-muted-foreground">{isCreator ? 'Verification Fee:' : 'Game Fee:'}</span>
-              <span className="font-bold text-accent">{fee} {isCreator ? 'ETH' : selectedToken}</span>
+              <div className="flex flex-col items-end">
+                <span className="font-bold text-accent">{fee} {isCreator ? 'ETH' : selectedToken}</span>
+                {/* Show approximate USD for ETH payments */}
+                {(isCreator || selectedToken === 'ETH') && ethPriceUsd && (
+                  <span className="text-xs text-muted-foreground">≈ ${(parseFloat(fee) * ethPriceUsd).toFixed(2)}</span>
+                )}
+              </div>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Your Balance:</span>
               <div className="flex items-center gap-2">
                 <span className="font-semibold">{parseFloat(balance).toFixed(isCreator || selectedToken === 'ETH' ? 6 : 2)} {isCreator ? 'ETH' : selectedToken}</span>
                 {hasEnoughBalance ? (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <CheckCircle className="h-4 w-4 text-primary" />
                 ) : (
                   <AlertCircle className="h-4 w-4 text-destructive" />
                 )}

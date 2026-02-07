@@ -18,9 +18,9 @@ import logo2048 from '@/assets/logo-2048.png';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
-const GAME_FEE_ETH = '0.0005';
+// USDC is always $1.49. ETH is fetched at runtime via the eth-price edge function.
 const GAME_FEE_USDC = '1.49';
-const CREATOR_FEE_ETH = '0.0001'; // $0.1 for creators (sign-only verification)
+const CREATOR_FEE_ETH = '0.0001'; // $0.10 for creators (sign-only verification)
 
 // Creator wallet addresses that can access admin AND pay reduced fee
 const CREATOR_WALLETS = [
@@ -50,9 +50,31 @@ const Index = () => {
   const [balanceUSDC, setBalanceUSDC] = useState('0');
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasPaidForSession, setHasPaidForSession] = useState(false);
+  const [dynamicEthFee, setDynamicEthFee] = useState<string | null>(null);
+  const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null);
 
   const isAdmin = isCreatorWallet(walletAddress);
   const isCreator = isCreatorWallet(walletAddress);
+
+  // Fetch dynamic ETH price (once on mount)
+  useEffect(() => {
+    const fetchEthFee = async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/eth-price`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.fee_eth) {
+            setDynamicEthFee(data.fee_eth);
+            setEthPriceUsd(data.eth_price_usd ?? null);
+          }
+        }
+      } catch {
+        // Fallback: use 0.0005
+        setDynamicEthFee('0.00050000');
+      }
+    };
+    fetchEthFee();
+  }, []);
 
   const handleBalanceUpdate = useCallback((ethBal: string, usdcBal: string) => {
     setBalanceETH(ethBal);
@@ -94,7 +116,11 @@ const Index = () => {
     try {
       // Creator wallets only pay reduced verification fee in ETH
       const isCreatorPayment = isCreator;
-      const feeAmount = isCreatorPayment ? CREATOR_FEE_ETH : (token === 'ETH' ? GAME_FEE_ETH : GAME_FEE_USDC);
+      const feeAmount = isCreatorPayment
+        ? CREATOR_FEE_ETH
+        : token === 'ETH'
+        ? dynamicEthFee ?? '0.00050000'
+        : GAME_FEE_USDC;
       const paymentToken = isCreatorPayment ? 'ETH' : token;
       
       toast.info(isCreatorPayment 
@@ -369,12 +395,13 @@ const Index = () => {
         isOpen={showPayment}
         onClose={() => setShowPayment(false)}
         onPay={startNewGame}
-        feeETH={isCreator ? CREATOR_FEE_ETH : GAME_FEE_ETH}
+        feeETH={isCreator ? CREATOR_FEE_ETH : dynamicEthFee ?? '0.00050000'}
         feeUSDC={GAME_FEE_USDC}
         balanceETH={balanceETH}
         balanceUSDC={balanceUSDC}
         isLoading={isProcessing}
         isCreator={isCreator}
+        ethPriceUsd={ethPriceUsd ?? undefined}
       />
     </div>
   );
