@@ -27,8 +27,6 @@ export const GameOverModal = ({ isOpen, score, won, onPlayAgain, onClose }: Game
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent 
         className="sm:max-w-md bg-card border-border"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">

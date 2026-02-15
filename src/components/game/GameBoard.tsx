@@ -19,11 +19,17 @@ export const GameBoard = ({ grid, onMove, disabled = false }: GameBoardProps) =>
     if (!board) return;
 
     const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
       const touch = e.touches[0];
       setTouchStart({ x: touch.clientX, y: touch.clientY });
     };
 
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
     const handleTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
       if (!touchStart) return;
 
       const touch = e.changedTouches[0];
@@ -44,11 +50,13 @@ export const GameBoard = ({ grid, onMove, disabled = false }: GameBoardProps) =>
       setTouchStart(null);
     };
 
-    board.addEventListener('touchstart', handleTouchStart, { passive: true });
-    board.addEventListener('touchend', handleTouchEnd, { passive: true });
+    board.addEventListener('touchstart', handleTouchStart, { passive: false });
+    board.addEventListener('touchmove', handleTouchMove, { passive: false });
+    board.addEventListener('touchend', handleTouchEnd, { passive: false });
 
     return () => {
       board.removeEventListener('touchstart', handleTouchStart);
+      board.removeEventListener('touchmove', handleTouchMove);
       board.removeEventListener('touchend', handleTouchEnd);
     };
   }, [touchStart, onMove, disabled]);
