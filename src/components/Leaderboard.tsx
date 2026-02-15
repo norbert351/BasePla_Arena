@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Trophy, Medal, Award, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getBaseProfileUrl } from '@/lib/basename';
+import { getBaseProfileUrl, resolveBasename } from '@/lib/basename';
+import { useState, useEffect } from 'react';
 
 // Creator wallets to display with badge
 const CREATOR_WALLETS = [
@@ -20,10 +21,11 @@ interface LeaderboardEntry {
 }
 
 export const Leaderboard = () => {
+  const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
+
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
     queryFn: async () => {
-      // Get top 50 scores from game sessions with player display names
       const { data, error } = await supabase
         .from('game_sessions')
         .select(`
@@ -36,7 +38,6 @@ export const Leaderboard = () => {
 
       if (error) throw error;
 
-      // Group by player and get highest score
       const playerScores = new Map<string, { wallet: string; displayName: string; score: number }>();
       
       data?.forEach((session: any) => {
@@ -52,7 +53,6 @@ export const Leaderboard = () => {
         }
       });
 
-      // Convert to array and sort
       const sorted = Array.from(playerScores.values())
         .sort((a, b) => b.score - a.score)
         .slice(0, 20)
@@ -68,6 +68,37 @@ export const Leaderboard = () => {
       return sorted;
     },
   });
+
+  // Resolve Base usernames (basenames) for all wallets
+  useEffect(() => {
+    if (entries.length === 0) return;
+    
+    const resolveNames = async () => {
+      const newResolved: Record<string, string> = {};
+      
+      await Promise.all(
+        entries.map(async (entry) => {
+          // Skip if already has a basename-style display name
+          if (entry.displayName.includes('.base.eth') || entry.displayName.includes('.')) return;
+          
+          try {
+            const profile = await resolveBasename(entry.wallet);
+            if (profile.name) {
+              newResolved[entry.wallet] = profile.name;
+            }
+          } catch {
+            // Silently fail for individual resolutions
+          }
+        })
+      );
+      
+      if (Object.keys(newResolved).length > 0) {
+        setResolvedNames(prev => ({ ...prev, ...newResolved }));
+      }
+    };
+    
+    resolveNames();
+  }, [entries]);
 
   const shortenWallet = (wallet: string) => {
     return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
@@ -127,7 +158,7 @@ export const Leaderboard = () => {
                   {getRankIcon(entry.rank)}
                   <div className="flex flex-col">
                     <span className="font-semibold text-sm flex items-center gap-1">
-                      {entry.displayName}
+                      {resolvedNames[entry.wallet] || entry.displayName}
                       {entry.isCreator && (
                         <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">👑 Creator</span>
                       )}
