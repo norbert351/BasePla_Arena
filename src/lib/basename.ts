@@ -1,4 +1,4 @@
-import { createPublicClient, http, type Address, type Hex, keccak256, toHex, concat, stringToBytes } from 'viem';
+import { createPublicClient, http, type Address, type Hex, keccak256, toHex, concat, stringToBytes, hexToBytes, bytesToHex } from 'viem';
 import { base } from 'viem/chains';
 
 // Base L2 Resolver contract address
@@ -18,22 +18,24 @@ const getPublicClient = () => {
 };
 
 /**
- * Simple namehash implementation for reverse lookup
+ * Simple namehash implementation for reverse lookup (browser-compatible)
  */
 const namehash = (name: string): Hex => {
   let node = new Uint8Array(32).fill(0);
   
-  if (name === '') return `0x${Buffer.from(node).toString('hex')}` as Hex;
+  if (name === '') return bytesToHex(node);
   
   const labels = name.split('.').reverse();
   
   for (const label of labels) {
     const labelHash = keccak256(toHex(stringToBytes(label)));
-    const combined = concat([`0x${Buffer.from(node).toString('hex')}` as Hex, labelHash]);
-    node = new Uint8Array(Buffer.from(keccak256(combined).slice(2), 'hex'));
+    const nodeHex = bytesToHex(node);
+    const combined = concat([nodeHex, labelHash]);
+    const hashBytes = hexToBytes(keccak256(combined));
+    node = new Uint8Array(hashBytes);
   }
   
-  return `0x${Buffer.from(node).toString('hex')}` as Hex;
+  return bytesToHex(node);
 };
 
 /**
@@ -67,7 +69,11 @@ export const resolveBasename = async (address: string): Promise<BaseProfile> => 
           const offset = parseInt(data.slice(0, 64), 16) * 2;
           const length = parseInt(data.slice(offset, offset + 64), 16);
           const nameHex = data.slice(offset + 64, offset + 64 + length * 2);
-          name = Buffer.from(nameHex, 'hex').toString('utf8');
+          // Browser-compatible hex to string conversion
+          const bytes = new Uint8Array(
+            nameHex.match(/.{2}/g)!.map((b: string) => parseInt(b, 16))
+          );
+          name = new TextDecoder().decode(bytes);
         }
       } catch (e) {
         console.error('Failed to decode name:', e);
@@ -93,11 +99,9 @@ export const resolveBasename = async (address: string): Promise<BaseProfile> => 
  * Get the Base profile URL for a given address or basename
  */
 export const getBaseProfileUrl = (addressOrName: string): string => {
-  // If it's a basename (ends with .base.eth or similar), use it directly
   if (addressOrName.includes('.')) {
     return `https://www.base.org/name/${addressOrName}`;
   }
-  // Otherwise use the address
   return `https://basescan.org/address/${addressOrName}`;
 };
 
