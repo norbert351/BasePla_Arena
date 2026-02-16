@@ -158,7 +158,7 @@ export const Leaderboard = () => {
                   {getRankIcon(entry.rank)}
                   <div className="flex flex-col">
                     <span className="font-semibold text-sm flex items-center gap-1">
-                      {resolvedNames[entry.wallet] || entry.displayName}
+                      {(resolvedNames[entry.wallet] || entry.displayName).replace(/\.base\.eth$/i, '')}
                       {entry.isCreator && (
                         <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">👑 Creator</span>
                       )}

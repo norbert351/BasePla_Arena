@@ -81,7 +81,7 @@ export const resolveBasename = async (address: string): Promise<BaseProfile> => 
     }
 
     return {
-      name: name || null,
+      name: name ? name.replace(/\.base\.eth$/i, '') : null,
       avatar: avatar,
       address,
     };
