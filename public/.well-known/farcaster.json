@@ -21,11 +21,11 @@
     ],
     "primaryCategory": "games",
     "tags": ["games", "blockchain", "base", "puzzle", "crypto"],
-    "heroImageUrl": "https://mini-2048-base.vercel.app/embed-preview.png",
+    "heroImageUrl": "https://mini-2048-base.vercel.app/hero-banner.png",
     "tagline": "Puzzle Game with Rewards",
     "ogTitle": "2048 on BASE",
     "ogDescription": "Play to Earn on Base. Classic 2048 puzzle game on Base blockchain. Compete for monthly rewards",
-    "ogImageUrl": "https://mini-2048-base.vercel.app/og-preview.png",
+    "ogImageUrl": "https://mini-2048-base.vercel.app/hero-banner.png",
     "noindex": false
   }
 }
