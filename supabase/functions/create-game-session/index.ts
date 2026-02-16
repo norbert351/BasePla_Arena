@@ -48,7 +48,8 @@ async function resolveBasenameOnChain(address: string): Promise<string | null> {
         const length = parseInt(data.slice(offset, offset + 64), 16);
         const nameHex = data.slice(offset + 64, offset + 64 + length * 2);
         const bytes = nameHex.match(/.{2}/g)!.map((b: string) => parseInt(b, 16));
-        return new TextDecoder().decode(new Uint8Array(bytes));
+        const fullName = new TextDecoder().decode(new Uint8Array(bytes));
+        return fullName.replace(/\.base\.eth$/i, '');
       }
     }
     return null;
