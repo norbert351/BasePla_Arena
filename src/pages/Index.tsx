@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { use2048 } from '@/hooks/use2048';
+import { useMiniAppContext } from '@/hooks/useMiniAppContext';
 import { GameBoard } from '@/components/game/GameBoard';
 import { ScoreBox } from '@/components/game/ScoreBox';
 import { WalletConnect } from '@/components/game/WalletConnect';
@@ -41,6 +42,8 @@ const Index = () => {
     move,
     resetGame,
   } = use2048();
+
+  const { user: miniAppUser } = useMiniAppContext();
 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -149,6 +152,10 @@ const Index = () => {
           token_type: paymentToken,
           fee_amount: feeAmount,
           is_creator: isCreatorPayment,
+          // Pass MiniApp user context for profile storage
+          fid: miniAppUser?.fid || null,
+          display_name: miniAppUser?.displayName || miniAppUser?.username || null,
+          pfp_url: miniAppUser?.pfpUrl || null,
         }),
       });
 
@@ -178,7 +185,7 @@ const Index = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [walletAddress, isCreator, dynamicEthFee, resetGame]);
+  }, [walletAddress, isCreator, dynamicEthFee, resetGame, miniAppUser]);
 
   const handlePlayAgain = useCallback(() => {
     if (walletAddress && playerId) {

@@ -103,21 +103,27 @@ export type Database = {
         Row: {
           created_at: string
           display_name: string | null
+          fid: number | null
           id: string
+          pfp_url: string | null
           updated_at: string
           wallet_address: string
         }
         Insert: {
           created_at?: string
           display_name?: string | null
+          fid?: number | null
           id?: string
+          pfp_url?: string | null
           updated_at?: string
           wallet_address: string
         }
         Update: {
           created_at?: string
           display_name?: string | null
+          fid?: number | null
           id?: string
+          pfp_url?: string | null
           updated_at?: string
           wallet_address?: string
         }

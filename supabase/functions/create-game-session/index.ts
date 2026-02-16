@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { wallet_address, tx_hash, token_type, fee_amount, is_creator } = await req.json();
+    const { wallet_address, tx_hash, token_type, fee_amount, is_creator, fid, display_name: miniapp_display_name, pfp_url } = await req.json();
 
     if (!wallet_address || !tx_hash || !token_type || !fee_amount) {
       return new Response(
@@ -169,31 +169,43 @@ Deno.serve(async (req) => {
     if (existingPlayer) {
       playerId = existingPlayer.id;
       
-      // Try to update display_name with basename if not already set
-      const { data: playerData } = await supabase
-        .from("players")
-        .select("display_name")
-        .eq("id", playerId)
-        .single();
+      // Update profile data from MiniApp context (fid, pfp_url, display_name)
+      const updateFields: Record<string, unknown> = {};
+      if (fid) updateFields.fid = fid;
+      if (pfp_url) updateFields.pfp_url = pfp_url;
+      if (miniapp_display_name) updateFields.display_name = miniapp_display_name;
       
-      if (playerData && !playerData.display_name) {
-        const basename = await resolveBasenameOnChain(walletLower);
-        if (basename) {
-          await supabase
-            .from("players")
-            .update({ display_name: basename })
-            .eq("id", playerId);
+      // Fallback: resolve basename on-chain if no MiniApp display name
+      if (!miniapp_display_name) {
+        const { data: playerData } = await supabase
+          .from("players")
+          .select("display_name")
+          .eq("id", playerId)
+          .single();
+        
+        if (playerData && !playerData.display_name) {
+          const basename = await resolveBasenameOnChain(walletLower);
+          if (basename) updateFields.display_name = basename;
         }
       }
+      
+      if (Object.keys(updateFields).length > 0) {
+        await supabase
+          .from("players")
+          .update(updateFields)
+          .eq("id", playerId);
+      }
     } else {
-      // Resolve basename before creating player
-      const basename = await resolveBasenameOnChain(walletLower);
+      // Resolve basename as fallback if no MiniApp display name
+      const basename = !miniapp_display_name ? await resolveBasenameOnChain(walletLower) : null;
       
       const { data: newPlayer, error: insertError } = await supabase
         .from("players")
         .insert({ 
           wallet_address: wallet_address.toLowerCase(),
-          display_name: basename || null,
+          display_name: miniapp_display_name || basename || null,
+          fid: fid || null,
+          pfp_url: pfp_url || null,
         })
         .select("id")
         .single();
