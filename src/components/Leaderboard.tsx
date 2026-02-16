@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Trophy, Medal, Award, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getBaseProfileUrl, resolveBasename, getAvatarColor, getInitials } from '@/lib/basename';
-import { useState, useEffect } from 'react';
+import { getAvatarColor, getInitials } from '@/lib/basename';
+import { LeaderboardEntry } from './leaderboard/LeaderboardEntry';
 
 // Creator wallets to display with badge
 const CREATOR_WALLETS = [
@@ -11,23 +11,17 @@ const CREATOR_WALLETS = [
   '0xf79f164e634b76815b80b60a85e1258eb21d631c',
 ].map(addr => addr.toLowerCase());
 
-interface LeaderboardEntry {
+export interface LeaderboardPlayer {
   rank: number;
   displayName: string;
   wallet: string;
   score: number;
-  isTopTwenty: boolean;
   isCreator: boolean;
-}
-
-interface ResolvedProfile {
-  name: string;
-  avatar: string | null;
+  fid: number | null;
+  pfpUrl: string | null;
 }
 
 export const Leaderboard = () => {
-  const [resolvedProfiles, setResolvedProfiles] = useState<Record<string, ResolvedProfile>>({});
-
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
     queryFn: async () => {
@@ -36,24 +30,34 @@ export const Leaderboard = () => {
         .select(`
           score,
           player_id,
-          players!inner(wallet_address, display_name)
+          players!inner(wallet_address, display_name, fid, pfp_url)
         `)
         .order('score', { ascending: false })
         .limit(100);
 
       if (error) throw error;
 
-      const playerScores = new Map<string, { wallet: string; displayName: string; score: number }>();
+      const playerScores = new Map<string, {
+        wallet: string;
+        displayName: string;
+        score: number;
+        fid: number | null;
+        pfpUrl: string | null;
+      }>();
       
       data?.forEach((session: any) => {
         const wallet = session.players.wallet_address;
         const displayName = session.players.display_name;
+        const fid = session.players.fid;
+        const pfpUrl = session.players.pfp_url;
         const existing = playerScores.get(wallet);
         if (!existing || session.score > existing.score) {
           playerScores.set(wallet, { 
             wallet, 
             displayName: displayName || shortenWallet(wallet),
-            score: session.score 
+            score: session.score,
+            fid: fid || null,
+            pfpUrl: pfpUrl || null,
           });
         }
       });
@@ -66,79 +70,17 @@ export const Leaderboard = () => {
           wallet: entry.wallet,
           displayName: entry.displayName,
           score: entry.score,
-          isTopTwenty: index < 20,
           isCreator: CREATOR_WALLETS.includes(entry.wallet.toLowerCase()),
+          fid: entry.fid,
+          pfpUrl: entry.pfpUrl,
         }));
 
       return sorted;
     },
   });
 
-  // Resolve Base profiles (name + avatar) for all wallets
-  useEffect(() => {
-    if (entries.length === 0) return;
-    
-    const resolveProfiles = async () => {
-      const newResolved: Record<string, ResolvedProfile> = {};
-      
-      await Promise.all(
-        entries.map(async (entry) => {
-          // Skip if already resolved
-          if (resolvedProfiles[entry.wallet]) return;
-          
-          try {
-            const profile = await resolveBasename(entry.wallet);
-            if (profile.name) {
-              newResolved[entry.wallet] = {
-                name: profile.name,
-                avatar: profile.avatar,
-              };
-            }
-          } catch {
-            // Silently fail for individual resolutions
-          }
-        })
-      );
-      
-      if (Object.keys(newResolved).length > 0) {
-        setResolvedProfiles(prev => ({ ...prev, ...newResolved }));
-      }
-    };
-    
-    resolveProfiles();
-  }, [entries]);
-
   const shortenWallet = (wallet: string) => {
     return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
-  };
-
-  const getRankDisplay = (rank: number) => {
-    if (rank === 1) return <Trophy className="h-5 w-5 text-accent" />;
-    if (rank === 2) return <Medal className="h-5 w-5 text-muted-foreground" />;
-    if (rank === 3) return <Award className="h-5 w-5 text-primary" />;
-    return <span className="w-5 text-center text-sm font-medium text-muted-foreground">{rank}</span>;
-  };
-
-  const getDisplayName = (entry: LeaderboardEntry): string => {
-    const resolved = resolvedProfiles[entry.wallet];
-    if (resolved?.name) return resolved.name;
-    return entry.displayName.replace(/\.base\.eth$/i, '');
-  };
-
-  const getAvatar = (entry: LeaderboardEntry): { url: string | null; color: string; initials: string } => {
-    const resolved = resolvedProfiles[entry.wallet];
-    const name = getDisplayName(entry);
-    return {
-      url: resolved?.avatar || null,
-      color: getAvatarColor(entry.wallet),
-      initials: getInitials(name),
-    };
-  };
-
-  const openProfile = (entry: LeaderboardEntry) => {
-    const name = getDisplayName(entry);
-    const profileUrl = getBaseProfileUrl(name.startsWith('0x') ? entry.wallet : name);
-    window.open(profileUrl, '_blank');
   };
 
   if (isLoading) {
@@ -177,68 +119,9 @@ export const Leaderboard = () => {
           </p>
         ) : (
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {entries.map((entry) => {
-              const avatar = getAvatar(entry);
-              const displayName = getDisplayName(entry);
-              
-              return (
-                <button
-                  key={entry.wallet}
-                  onClick={() => openProfile(entry)}
-                  className={cn(
-                    'w-full flex items-center justify-between p-3 rounded-lg transition-colors group text-left',
-                    entry.rank <= 3
-                      ? 'bg-primary/10 border border-primary/30 hover:bg-primary/20'
-                      : 'bg-secondary/50 hover:bg-secondary/80'
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    {getRankDisplay(entry.rank)}
-                    
-                    {/* Avatar */}
-                    <div
-                      className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden"
-                      style={{ backgroundColor: avatar.url ? 'transparent' : avatar.color }}
-                    >
-                      {avatar.url ? (
-                        <img
-                          src={avatar.url}
-                          alt={displayName}
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            (e.target as HTMLImageElement).parentElement!.style.backgroundColor = avatar.color;
-                            (e.target as HTMLImageElement).parentElement!.textContent = avatar.initials;
-                          }}
-                        />
-                      ) : (
-                        avatar.initials
-                      )}
-                    </div>
-
-                    {/* Name & wallet */}
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-semibold text-sm flex items-center gap-1 truncate">
-                        {displayName}
-                        {entry.isCreator && (
-                          <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full shrink-0">👑</span>
-                        )}
-                        <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-primary shrink-0" />
-                      </span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {shortenWallet(entry.wallet)}
-                      </span>
-                    </div>
-                  </div>
-                  <span className={cn(
-                    'font-bold tabular-nums shrink-0 ml-2',
-                    entry.rank <= 3 && 'text-accent'
-                  )}>
-                    {entry.score.toLocaleString()}
-                  </span>
-                </button>
-              );
-            })}
+            {entries.map((entry) => (
+              <LeaderboardEntry key={entry.wallet} entry={entry} />
+            ))}
           </div>
         )}
       </div>
