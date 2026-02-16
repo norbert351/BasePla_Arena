@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Trophy, Medal, Award, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getBaseProfileUrl, resolveBasename } from '@/lib/basename';
+import { getBaseProfileUrl, resolveBasename, getAvatarColor, getInitials } from '@/lib/basename';
 import { useState, useEffect } from 'react';
 
 // Creator wallets to display with badge
@@ -20,8 +20,13 @@ interface LeaderboardEntry {
   isCreator: boolean;
 }
 
+interface ResolvedProfile {
+  name: string;
+  avatar: string | null;
+}
+
 export const Leaderboard = () => {
-  const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
+  const [resolvedProfiles, setResolvedProfiles] = useState<Record<string, ResolvedProfile>>({});
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
@@ -69,22 +74,25 @@ export const Leaderboard = () => {
     },
   });
 
-  // Resolve Base usernames (basenames) for all wallets
+  // Resolve Base profiles (name + avatar) for all wallets
   useEffect(() => {
     if (entries.length === 0) return;
     
-    const resolveNames = async () => {
-      const newResolved: Record<string, string> = {};
+    const resolveProfiles = async () => {
+      const newResolved: Record<string, ResolvedProfile> = {};
       
       await Promise.all(
         entries.map(async (entry) => {
-          // Skip if already has a basename-style display name
-          if (entry.displayName.includes('.base.eth') || entry.displayName.includes('.')) return;
+          // Skip if already resolved
+          if (resolvedProfiles[entry.wallet]) return;
           
           try {
             const profile = await resolveBasename(entry.wallet);
             if (profile.name) {
-              newResolved[entry.wallet] = profile.name;
+              newResolved[entry.wallet] = {
+                name: profile.name,
+                avatar: profile.avatar,
+              };
             }
           } catch {
             // Silently fail for individual resolutions
@@ -93,26 +101,43 @@ export const Leaderboard = () => {
       );
       
       if (Object.keys(newResolved).length > 0) {
-        setResolvedNames(prev => ({ ...prev, ...newResolved }));
+        setResolvedProfiles(prev => ({ ...prev, ...newResolved }));
       }
     };
     
-    resolveNames();
+    resolveProfiles();
   }, [entries]);
 
   const shortenWallet = (wallet: string) => {
     return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
   };
 
-  const getRankIcon = (rank: number) => {
+  const getRankDisplay = (rank: number) => {
     if (rank === 1) return <Trophy className="h-5 w-5 text-accent" />;
     if (rank === 2) return <Medal className="h-5 w-5 text-muted-foreground" />;
     if (rank === 3) return <Award className="h-5 w-5 text-primary" />;
-    return <span className="w-5 text-center text-muted-foreground">{rank}</span>;
+    return <span className="w-5 text-center text-sm font-medium text-muted-foreground">{rank}</span>;
+  };
+
+  const getDisplayName = (entry: LeaderboardEntry): string => {
+    const resolved = resolvedProfiles[entry.wallet];
+    if (resolved?.name) return resolved.name;
+    return entry.displayName.replace(/\.base\.eth$/i, '');
+  };
+
+  const getAvatar = (entry: LeaderboardEntry): { url: string | null; color: string; initials: string } => {
+    const resolved = resolvedProfiles[entry.wallet];
+    const name = getDisplayName(entry);
+    return {
+      url: resolved?.avatar || null,
+      color: getAvatarColor(entry.wallet),
+      initials: getInitials(name),
+    };
   };
 
   const openProfile = (entry: LeaderboardEntry) => {
-    const profileUrl = getBaseProfileUrl(entry.displayName.includes('.') ? entry.displayName : entry.wallet);
+    const name = getDisplayName(entry);
+    const profileUrl = getBaseProfileUrl(name.startsWith('0x') ? entry.wallet : name);
     window.open(profileUrl, '_blank');
   };
 
@@ -137,48 +162,83 @@ export const Leaderboard = () => {
           </span>
         </div>
 
+        {/* Column headers */}
+        <div className="flex items-center justify-between px-3 pb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <div className="flex items-center gap-3">
+            <span className="w-5 text-center">#</span>
+            <span>Player</span>
+          </div>
+          <span>Score</span>
+        </div>
+
         {entries.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
             No scores yet. Be the first to play!
           </p>
         ) : (
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {entries.map((entry) => (
-              <button
-                key={entry.wallet}
-                onClick={() => openProfile(entry)}
-                className={cn(
-                  'w-full flex items-center justify-between p-3 rounded-lg transition-colors group text-left',
-                  entry.isTopTwenty
-                    ? 'bg-primary/10 border border-primary/30 hover:bg-primary/20'
-                    : 'bg-secondary/50 hover:bg-secondary/80'
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  {getRankIcon(entry.rank)}
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-sm flex items-center gap-1">
-                      {(resolvedNames[entry.wallet] || entry.displayName).replace(/\.base\.eth$/i, '')}
-                      {entry.isCreator && (
-                        <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">👑 Creator</span>
+            {entries.map((entry) => {
+              const avatar = getAvatar(entry);
+              const displayName = getDisplayName(entry);
+              
+              return (
+                <button
+                  key={entry.wallet}
+                  onClick={() => openProfile(entry)}
+                  className={cn(
+                    'w-full flex items-center justify-between p-3 rounded-lg transition-colors group text-left',
+                    entry.rank <= 3
+                      ? 'bg-primary/10 border border-primary/30 hover:bg-primary/20'
+                      : 'bg-secondary/50 hover:bg-secondary/80'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    {getRankDisplay(entry.rank)}
+                    
+                    {/* Avatar */}
+                    <div
+                      className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden"
+                      style={{ backgroundColor: avatar.url ? 'transparent' : avatar.color }}
+                    >
+                      {avatar.url ? (
+                        <img
+                          src={avatar.url}
+                          alt={displayName}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).parentElement!.style.backgroundColor = avatar.color;
+                            (e.target as HTMLImageElement).parentElement!.textContent = avatar.initials;
+                          }}
+                        />
+                      ) : (
+                        avatar.initials
                       )}
-                      <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
-                    </span>
-                    {entry.displayName !== shortenWallet(entry.wallet) && (
+                    </div>
+
+                    {/* Name & wallet */}
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold text-sm flex items-center gap-1 truncate">
+                        {displayName}
+                        {entry.isCreator && (
+                          <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full shrink-0">👑</span>
+                        )}
+                        <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-primary shrink-0" />
+                      </span>
                       <span className="font-mono text-xs text-muted-foreground">
                         {shortenWallet(entry.wallet)}
                       </span>
-                    )}
+                    </div>
                   </div>
-                </div>
-                <span className={cn(
-                  'font-bold',
-                  entry.isTopTwenty && 'text-accent'
-                )}>
-                  {entry.score.toLocaleString()}
-                </span>
-              </button>
-            ))}
+                  <span className={cn(
+                    'font-bold tabular-nums shrink-0 ml-2',
+                    entry.rank <= 3 && 'text-accent'
+                  )}>
+                    {entry.score.toLocaleString()}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
