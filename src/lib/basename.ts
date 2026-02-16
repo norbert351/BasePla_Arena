@@ -80,9 +80,45 @@ export const resolveBasename = async (address: string): Promise<BaseProfile> => 
       }
     }
 
+    // Try to resolve avatar text record if we have a name
+    if (name) {
+      try {
+        const fullName = name.endsWith('.base.eth') ? name : `${name}.base.eth`;
+        const nameNode = namehash(fullName);
+        
+        // text(bytes32 node, string key) selector = 0x59d1d43c
+        // Encode: node (32 bytes) + offset to string (32 bytes) + string length (32 bytes) + string data
+        const keyBytes = new TextEncoder().encode('avatar');
+        const keyHex = Array.from(keyBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        const keyPadded = keyHex.padEnd(64, '0');
+        
+        const textCallData = `0x59d1d43c${nameNode.slice(2)}${'0000000000000000000000000000000000000000000000000000000000000040'}${'000000000000000000000000000000000000000000000000000000000000000' + keyBytes.length.toString(16)}${keyPadded}` as Hex;
+        
+        const avatarResult = await client.call({
+          to: BASE_L2_RESOLVER,
+          data: textCallData,
+        }).catch(() => ({ data: null }));
+        
+        if (avatarResult.data && avatarResult.data !== '0x' && avatarResult.data.length > 130) {
+          const adata = avatarResult.data.slice(2);
+          const aoffset = parseInt(adata.slice(0, 64), 16) * 2;
+          const alength = parseInt(adata.slice(aoffset, aoffset + 64), 16);
+          if (alength > 0) {
+            const avatarHex = adata.slice(aoffset + 64, aoffset + 64 + alength * 2);
+            const avatarBytes = new Uint8Array(
+              avatarHex.match(/.{2}/g)!.map((b: string) => parseInt(b, 16))
+            );
+            avatar = new TextDecoder().decode(avatarBytes);
+          }
+        }
+      } catch {
+        // Avatar resolution is optional
+      }
+    }
+
     return {
       name: name ? name.replace(/\.base\.eth$/i, '') : null,
-      avatar: avatar,
+      avatar,
       address,
     };
   } catch (error) {
@@ -96,13 +132,32 @@ export const resolveBasename = async (address: string): Promise<BaseProfile> => 
 };
 
 /**
- * Get the Base profile URL for a given address or basename
+ * Get the Base app profile URL for a given basename or address
  */
 export const getBaseProfileUrl = (addressOrName: string): string => {
-  if (addressOrName.includes('.')) {
-    return `https://www.base.org/name/${addressOrName}`;
+  // Link to Base app profile page
+  const cleanName = addressOrName.replace(/\.base\.eth$/i, '');
+  if (cleanName.includes('.') || !cleanName.startsWith('0x')) {
+    return `https://www.base.org/name/${cleanName}`;
   }
   return `https://basescan.org/address/${addressOrName}`;
+};
+
+/**
+ * Generate a deterministic color from a wallet address for avatar fallback
+ */
+export const getAvatarColor = (address: string): string => {
+  const hash = address.slice(2, 8);
+  const hue = parseInt(hash, 16) % 360;
+  return `hsl(${hue}, 65%, 55%)`;
+};
+
+/**
+ * Get initials from a display name
+ */
+export const getInitials = (name: string): string => {
+  if (name.startsWith('0x')) return name.slice(2, 4).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
 };
 
 /**
