@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { wallet_address, tx_hash, token_type, fee_amount, is_creator, fid, display_name: miniapp_display_name, pfp_url } = await req.json();
+    const { wallet_address, tx_hash, token_type, fee_amount, is_creator, fid, display_name: miniapp_display_name, pfp_url } = await req.json() as Record<string, any>;
 
     if (!wallet_address || !tx_hash || !token_type || !fee_amount) {
       return new Response(
