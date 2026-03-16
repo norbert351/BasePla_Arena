@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { use2048 } from '@/hooks/use2048';
-import { useMiniAppContext } from '@/hooks/useMiniAppContext';
 import { GameBoard } from '@/components/game/GameBoard';
 import { ScoreBox } from '@/components/game/ScoreBox';
 import { WalletConnect } from '@/components/game/WalletConnect';
@@ -43,8 +42,6 @@ const Index = () => {
     resetGame,
   } = use2048();
 
-  const { user: miniAppUser } = useMiniAppContext();
-
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -72,7 +69,6 @@ const Index = () => {
           }
         }
       } catch {
-        // Fallback: use 0.0005
         setDynamicEthFee('0.00050000');
       }
     };
@@ -87,7 +83,6 @@ const Index = () => {
   const handleWalletConnect = useCallback(async (address: string) => {
     setWalletAddress(address);
     
-    // Check if player exists (read-only, allowed by RLS)
     const { data: existingPlayer } = await supabase
       .from('players')
       .select('id')
@@ -97,7 +92,6 @@ const Index = () => {
     if (existingPlayer) {
       setPlayerId(existingPlayer.id);
     }
-    // Player creation now happens via edge function during payment
   }, []);
 
   const handleWalletDisconnect = useCallback(() => {
@@ -117,7 +111,6 @@ const Index = () => {
 
     setIsProcessing(true);
     try {
-      // Creator wallets only pay reduced verification fee in ETH
       const isCreatorPayment = isCreator;
       const feeAmount = isCreatorPayment
         ? CREATOR_FEE_ETH
@@ -140,22 +133,15 @@ const Index = () => {
 
       toast.info('Payment confirmed! Creating game session...');
 
-      // Create game session via edge function (server-side validation)
       const response = await fetch(`${SUPABASE_URL}/functions/v1/create-game-session`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wallet_address: walletAddress,
           tx_hash: txHash,
           token_type: paymentToken,
           fee_amount: feeAmount,
           is_creator: isCreatorPayment,
-          // Pass MiniApp user context for profile storage
-          fid: miniAppUser?.fid || null,
-          display_name: miniAppUser?.displayName || miniAppUser?.username || null,
-          pfp_url: miniAppUser?.pfpUrl || null,
         }),
       });
 
@@ -185,7 +171,7 @@ const Index = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [walletAddress, isCreator, dynamicEthFee, resetGame, miniAppUser]);
+  }, [walletAddress, isCreator, dynamicEthFee, resetGame]);
 
   const handlePlayAgain = useCallback(() => {
     if (walletAddress && playerId) {
@@ -195,18 +181,14 @@ const Index = () => {
     }
   }, [walletAddress, playerId, resetGame]);
 
-  // Track previous score to detect changes
   const prevScoreRef = useRef(score);
   
-  // Save score when game ends via edge function
   const handleGameEnd = useCallback(async () => {
     if (sessionId && walletAddress && score > 0) {
       try {
         await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             session_id: sessionId,
             wallet_address: walletAddress,
@@ -221,16 +203,12 @@ const Index = () => {
     }
   }, [sessionId, walletAddress, score]);
 
-  // Update score periodically during gameplay (every significant score increase)
   useEffect(() => {
     if (sessionId && walletAddress && hasPaidForSession && score > prevScoreRef.current + 500) {
       prevScoreRef.current = score;
-      // Save intermediate score
       fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: sessionId,
           wallet_address: walletAddress,
@@ -241,14 +219,12 @@ const Index = () => {
     }
   }, [sessionId, walletAddress, hasPaidForSession, score]);
 
-  // Trigger save on game over
   useEffect(() => {
     if ((gameOver || won) && sessionId) {
       handleGameEnd();
     }
   }, [gameOver, won, sessionId, handleGameEnd]);
 
-  // Determine if play is blocked - must connect wallet AND pay
   const needsWalletConnection = !walletAddress;
   const needsPayment = walletAddress && !hasPaidForSession && !gameOver && !won;
   const isPlayBlocked = needsWalletConnection || needsPayment;
@@ -290,7 +266,6 @@ const Index = () => {
             </TabsList>
 
             <TabsContent value="game" className="space-y-6 animate-slide-up">
-              {/* Game Controls */}
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <ScoreBox label="Score" score={score} />
                 <div className="flex flex-col items-center gap-3">
@@ -320,14 +295,12 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* Info Banner */}
               <div className="gradient-primary rounded-lg p-4 text-center text-primary-foreground">
                 <p className="text-sm font-medium">
                   💰 Pay ${GAME_FEE_USDC} per session (ETH or USDC) • Top 20 monthly players share 60% of fees!
                 </p>
               </div>
 
-              {/* Game Board - Always visible, disabled until wallet connected and paid */}
               <div className="relative">
                 {isPlayBlocked && (
                   <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center rounded-xl">
@@ -359,12 +332,10 @@ const Index = () => {
                 <GameBoard grid={grid} onMove={move} disabled={!!isPlayBlocked} />
               </div>
 
-              {/* Instructions */}
               <p className="text-center text-muted-foreground text-sm">
                 Use arrow keys or swipe to move tiles. Combine matching numbers to reach 2048!
               </p>
 
-              {/* Moves counter */}
               {moveCount > 0 && (
                 <p className="text-center text-muted-foreground text-xs">
                   Moves: {moveCount}
