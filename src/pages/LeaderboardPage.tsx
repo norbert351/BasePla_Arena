@@ -21,10 +21,10 @@ const LeaderboardPage = () => {
     queryFn: async () => {
       // We need to filter by game_type but types may not reflect new column yet
       // Use raw query approach
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from('game_sessions')
-        .select(`score, player_id, players!inner(wallet_address, display_name, username, fid, pfp_url)`)
-        .eq('game_type' as any, gameType)
+        .select(`score, player_id, players!inner(wallet_address, display_name, username, fid, pfp_url)`) as any)
+        .eq('game_type', gameType)
         .order('score', { ascending: false })
         .limit(100);
 
