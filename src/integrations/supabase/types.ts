@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           ended_at: string | null
           fee_paid: number
+          game_type: string
           id: string
           is_active: boolean
           player_id: string
@@ -29,6 +30,7 @@ export type Database = {
         Insert: {
           ended_at?: string | null
           fee_paid?: number
+          game_type?: string
           id?: string
           is_active?: boolean
           player_id: string
@@ -40,6 +42,7 @@ export type Database = {
         Update: {
           ended_at?: string | null
           fee_paid?: number
+          game_type?: string
           id?: string
           is_active?: boolean
           player_id?: string
@@ -107,6 +110,7 @@ export type Database = {
           id: string
           pfp_url: string | null
           updated_at: string
+          username: string | null
           wallet_address: string
         }
         Insert: {
@@ -116,6 +120,7 @@ export type Database = {
           id?: string
           pfp_url?: string | null
           updated_at?: string
+          username?: string | null
           wallet_address: string
         }
         Update: {
@@ -125,6 +130,7 @@ export type Database = {
           id?: string
           pfp_url?: string | null
           updated_at?: string
+          username?: string | null
           wallet_address?: string
         }
         Relationships: []
