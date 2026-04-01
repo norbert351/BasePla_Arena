@@ -5,7 +5,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider } from "wagmi";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { wagmiConfig } from "./lib/wagmi";
-import Index from "./pages/Index";
+import Home from "./pages/Home";
+import Play2048 from "./pages/Play2048";
+import PlayTetris from "./pages/PlayTetris";
+import LeaderboardPage from "./pages/LeaderboardPage";
+import Profile from "./pages/Profile";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -18,7 +23,12 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/play/2048" element={<Play2048 />} />
+            <Route path="/play/tetris" element={<PlayTetris />} />
+            <Route path="/leaderboard/:gameType" element={<LeaderboardPage />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/admin" element={<Admin />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

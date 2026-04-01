@@ -51,8 +51,8 @@ Deno.serve(async (req) => {
   try {
     const ethUsd = await fetchEthPrice();
 
-    // Target fee in USD
-    const targetUsd = 1.49;
+    // Target fee in USD ($0.99)
+    const targetUsd = 0.99;
 
     // Calculate ETH amount required to meet targetUsd
     const ethAmount = targetUsd / ethUsd;

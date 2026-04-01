@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { wallet_address, tx_hash, token_type, fee_amount, is_creator, fid, display_name: miniapp_display_name, pfp_url } = await req.json() as Record<string, any>;
+    const { wallet_address, tx_hash, token_type, fee_amount, is_creator, fid, display_name: miniapp_display_name, pfp_url, game_type } = await req.json() as Record<string, any>;
 
     if (!wallet_address || !tx_hash || !token_type || !fee_amount) {
       return new Response(
@@ -126,8 +126,8 @@ Deno.serve(async (req) => {
 
     // Validate fee amount matches expected values
     const expectedFees = isCreatorRequested
-      ? { ETH: 0.0001, USDC: 1.49 }
-      : { ETH: 0.0005, USDC: 1.49 };
+      ? { ETH: 0.0001, USDC: 0.99 }
+      : { ETH: 0.0003, USDC: 0.99 };
 
     const parsedFee = parseFloat(fee_amount);
     if (Number.isNaN(parsedFee) || parsedFee <= 0) {
@@ -220,6 +220,8 @@ Deno.serve(async (req) => {
     }
 
     // Create game session with tx_hash for verification
+    const validGameType = ['2048', 'tetris'].includes(game_type) ? game_type : '2048';
+
     const { data: session, error: sessionError } = await supabase
       .from("game_sessions")
       .insert({
@@ -228,7 +230,8 @@ Deno.serve(async (req) => {
         tx_hash: tx_hash,
         token_type: token_type,
         is_active: true,
-        score: 0
+        score: 0,
+        game_type: validGameType,
       })
       .select("id")
       .single();
