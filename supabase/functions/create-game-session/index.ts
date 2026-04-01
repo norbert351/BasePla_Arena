@@ -126,8 +126,8 @@ Deno.serve(async (req) => {
 
     // Validate fee amount matches expected values
     const expectedFees = isCreatorRequested
-      ? { ETH: 0.0001, USDC: 1.49 }
-      : { ETH: 0.0005, USDC: 1.49 };
+      ? { ETH: 0.0001, USDC: 0.99 }
+      : { ETH: 0.0003, USDC: 0.99 };
 
     const parsedFee = parseFloat(fee_amount);
     if (Number.isNaN(parsedFee) || parsedFee <= 0) {
