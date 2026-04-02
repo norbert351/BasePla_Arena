@@ -54,6 +54,14 @@ const Home = () => {
                 </Button>
               </Link>
             )}
+            {isAdmin && (
+              <Link to="/admin">
+                <Button variant="ghost" size="sm">
+                  <Shield className="h-4 w-4 mr-1" />
+                  Admin
+                </Button>
+              </Link>
+            )}
             <WalletConnect onConnect={() => {}} onDisconnect={() => {}} />
           </div>
         </div>
