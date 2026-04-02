@@ -77,7 +77,7 @@ export const useTetris = () => {
   const [lines, setLines] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-
+  const [frozen, setFrozen] = useState(true); // frozen until paid
   const pieceRef = useRef(randomPiece());
   const posRef = useRef<Position>({ x: 3, y: -2 });
   const [, forceRender] = useState(0);
