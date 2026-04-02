@@ -142,7 +142,7 @@ export const useTetris = () => {
   }, [gameOver, isPaused]);
 
   const rotatePiece = useCallback(() => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     const rotated = rotate(pieceRef.current.shape);
     setBoard(prev => {
       if (isValid(prev, rotated, posRef.current)) {
