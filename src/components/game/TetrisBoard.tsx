@@ -21,7 +21,7 @@ export const TetrisBoard = ({ board, disabled, onMoveLeft, onMoveRight, onMoveDo
 
     const handleTouchStart = (e: TouchEvent) => {
       e.preventDefault();
-      setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+      setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() });
     };
     const handleTouchMove = (e: TouchEvent) => e.preventDefault();
     const handleTouchEnd = (e: TouchEvent) => {
