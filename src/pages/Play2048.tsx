@@ -209,10 +209,6 @@ const Play2048 = () => {
             )}
           </div>
 
-          <div className="gradient-primary rounded-lg p-3 text-center text-primary-foreground">
-            <p className="text-sm font-medium">💰 $0.99 per session • Top 20 share 60% of fees!</p>
-          </div>
-
           <div className="relative">
             {isPlayBlocked && (
               <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center rounded-xl">
