@@ -12,7 +12,7 @@ interface TetrisBoardProps {
 
 export const TetrisBoard = ({ board, disabled, onMoveLeft, onMoveRight, onMoveDown, onRotate, onHardDrop }: TetrisBoardProps) => {
   const boardRef = useRef<HTMLDivElement>(null);
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number; time: number } | null>(null);
 
   useEffect(() => {
     if (disabled) return;
