@@ -30,7 +30,8 @@ const games = [
 ];
 
 const Home = () => {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
+  const isAdmin = isConnected && address && CREATOR_WALLETS.includes(address.toLowerCase());
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
