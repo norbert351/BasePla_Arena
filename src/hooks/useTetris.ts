@@ -116,7 +116,7 @@ export const useTetris = () => {
   }, [level, spawnPiece]);
 
   const moveDown = useCallback(() => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     const newPos = { ...posRef.current, y: posRef.current.y + 1 };
     setBoard(prev => {
       if (isValid(prev, pieceRef.current.shape, newPos)) {
