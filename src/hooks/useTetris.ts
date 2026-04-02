@@ -167,11 +167,11 @@ export const useTetris = () => {
 
   // Auto-drop
   useEffect(() => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     const speed = Math.max(100, 800 - (level - 1) * 70);
     const interval = setInterval(moveDown, speed);
     return () => clearInterval(interval);
-  }, [moveDown, level, gameOver, isPaused]);
+  }, [moveDown, level, gameOver, isPaused, frozen]);
 
   // Keyboard
   useEffect(() => {
