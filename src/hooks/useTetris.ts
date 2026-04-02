@@ -77,7 +77,7 @@ export const useTetris = () => {
   const [lines, setLines] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-
+  const [frozen, setFrozen] = useState(true); // frozen until paid
   const pieceRef = useRef(randomPiece());
   const posRef = useRef<Position>({ x: 3, y: -2 });
   const [, forceRender] = useState(0);
@@ -116,7 +116,7 @@ export const useTetris = () => {
   }, [level, spawnPiece]);
 
   const moveDown = useCallback(() => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     const newPos = { ...posRef.current, y: posRef.current.y + 1 };
     setBoard(prev => {
       if (isValid(prev, pieceRef.current.shape, newPos)) {
@@ -130,7 +130,7 @@ export const useTetris = () => {
   }, [gameOver, isPaused, lockPiece]);
 
   const moveHorizontal = useCallback((dir: -1 | 1) => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     const newPos = { ...posRef.current, x: posRef.current.x + dir };
     setBoard(prev => {
       if (isValid(prev, pieceRef.current.shape, newPos)) {
@@ -142,7 +142,7 @@ export const useTetris = () => {
   }, [gameOver, isPaused]);
 
   const rotatePiece = useCallback(() => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     const rotated = rotate(pieceRef.current.shape);
     setBoard(prev => {
       if (isValid(prev, rotated, posRef.current)) {
@@ -154,7 +154,7 @@ export const useTetris = () => {
   }, [gameOver, isPaused]);
 
   const hardDrop = useCallback(() => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     setBoard(prev => {
       let newY = posRef.current.y;
       while (isValid(prev, pieceRef.current.shape, { ...posRef.current, y: newY + 1 })) newY++;
@@ -167,11 +167,11 @@ export const useTetris = () => {
 
   // Auto-drop
   useEffect(() => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     const speed = Math.max(100, 800 - (level - 1) * 70);
     const interval = setInterval(moveDown, speed);
     return () => clearInterval(interval);
-  }, [moveDown, level, gameOver, isPaused]);
+  }, [moveDown, level, gameOver, isPaused, frozen]);
 
   // Keyboard
   useEffect(() => {
@@ -196,6 +196,7 @@ export const useTetris = () => {
     setLines(0);
     setGameOver(false);
     setIsPaused(false);
+    setFrozen(false);
     spawnPiece();
     rerender();
   }, [spawnPiece]);
@@ -226,5 +227,6 @@ export const useTetris = () => {
     hardDrop,
     resetGame,
     togglePause: () => setIsPaused(p => !p),
+    setFrozen,
   };
 };

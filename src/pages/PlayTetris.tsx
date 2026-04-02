@@ -27,7 +27,7 @@ const isCreatorWallet = (address: string | null) =>
   address && CREATOR_WALLETS.includes(address.toLowerCase());
 
 const PlayTetris = () => {
-  const { board, score, level, lines, gameOver, isPaused, moveDown, moveHorizontal, rotatePiece, hardDrop, resetGame, togglePause } = useTetris();
+  const { board, score, level, lines, gameOver, isPaused, moveDown, moveHorizontal, rotatePiece, hardDrop, resetGame, togglePause, setFrozen } = useTetris();
 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);

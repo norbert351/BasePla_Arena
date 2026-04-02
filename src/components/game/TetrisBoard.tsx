@@ -12,7 +12,7 @@ interface TetrisBoardProps {
 
 export const TetrisBoard = ({ board, disabled, onMoveLeft, onMoveRight, onMoveDown, onRotate, onHardDrop }: TetrisBoardProps) => {
   const boardRef = useRef<HTMLDivElement>(null);
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number; time: number } | null>(null);
 
   useEffect(() => {
     if (disabled) return;
@@ -21,7 +21,7 @@ export const TetrisBoard = ({ board, disabled, onMoveLeft, onMoveRight, onMoveDo
 
     const handleTouchStart = (e: TouchEvent) => {
       e.preventDefault();
-      setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+      setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() });
     };
     const handleTouchMove = (e: TouchEvent) => e.preventDefault();
     const handleTouchEnd = (e: TouchEvent) => {
@@ -29,11 +29,15 @@ export const TetrisBoard = ({ board, disabled, onMoveLeft, onMoveRight, onMoveDo
       if (!touchStart) return;
       const dx = e.changedTouches[0].clientX - touchStart.x;
       const dy = e.changedTouches[0].clientY - touchStart.y;
+      const elapsed = Date.now() - touchStart.time;
       const minSwipe = 30;
-      if (Math.abs(dx) > Math.abs(dy)) {
+      // Tap (short touch, small movement) = rotate
+      if (Math.abs(dx) < minSwipe && Math.abs(dy) < minSwipe && elapsed < 300) {
+        onRotate?.();
+      } else if (Math.abs(dx) > Math.abs(dy)) {
         if (Math.abs(dx) > minSwipe) dx > 0 ? onMoveRight?.() : onMoveLeft?.();
       } else {
-        if (dy > minSwipe) onMoveDown?.();
+        if (dy > minSwipe) onHardDrop?.();
         else if (dy < -minSwipe) onRotate?.();
       }
       setTouchStart(null);

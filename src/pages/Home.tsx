@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom';
-import { Gamepad2, Trophy, User, Wallet } from 'lucide-react';
+import { Gamepad2, Trophy, User, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WalletConnect } from '@/components/game/WalletConnect';
 import { useAccount } from 'wagmi';
 import baseplayLogo from '@/assets/baseplay-logo.png';
+
+const CREATOR_WALLETS = [
+  '0xadf983e3d07d6abf344e1923f1d2164d8dffd816',
+  '0xf79f164e634b76815b80b60a85e1258eb21d631c',
+].map(addr => addr.toLowerCase());
 
 const games = [
   {
@@ -25,7 +30,8 @@ const games = [
 ];
 
 const Home = () => {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
+  const isAdmin = isConnected && address && CREATOR_WALLETS.includes(address.toLowerCase());
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
@@ -45,6 +51,14 @@ const Home = () => {
                 <Button variant="ghost" size="sm">
                   <User className="h-4 w-4 mr-1" />
                   Profile
+                </Button>
+              </Link>
+            )}
+            {isAdmin && (
+              <Link to="/admin">
+                <Button variant="ghost" size="sm">
+                  <Shield className="h-4 w-4 mr-1" />
+                  Admin
                 </Button>
               </Link>
             )}
