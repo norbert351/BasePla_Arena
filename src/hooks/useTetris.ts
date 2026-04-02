@@ -154,7 +154,7 @@ export const useTetris = () => {
   }, [gameOver, isPaused]);
 
   const hardDrop = useCallback(() => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     setBoard(prev => {
       let newY = posRef.current.y;
       while (isValid(prev, pieceRef.current.shape, { ...posRef.current, y: newY + 1 })) newY++;
