@@ -130,7 +130,7 @@ export const useTetris = () => {
   }, [gameOver, isPaused, lockPiece]);
 
   const moveHorizontal = useCallback((dir: -1 | 1) => {
-    if (gameOver || isPaused) return;
+    if (gameOver || isPaused || frozen) return;
     const newPos = { ...posRef.current, x: posRef.current.x + dir };
     setBoard(prev => {
       if (isValid(prev, pieceRef.current.shape, newPos)) {
