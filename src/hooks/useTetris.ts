@@ -196,6 +196,7 @@ export const useTetris = () => {
     setLines(0);
     setGameOver(false);
     setIsPaused(false);
+    setFrozen(false);
     spawnPiece();
     rerender();
   }, [spawnPiece]);
