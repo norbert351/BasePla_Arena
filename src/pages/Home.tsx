@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Gamepad2, Trophy, User, Shield } from 'lucide-react';
+import { Gamepad2, Trophy, User, Shield, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WalletConnect } from '@/components/game/WalletConnect';
 import { useAccount } from 'wagmi';
+import { useState } from 'react';
 import baseplayLogo from '@/assets/baseplay-logo.png';
 
 const CREATOR_WALLETS = [
@@ -32,39 +33,68 @@ const games = [
 const Home = () => {
   const { isConnected, address } = useAccount();
   const isAdmin = isConnected && address && CREATOR_WALLETS.includes(address.toLowerCase());
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
       {/* Header */}
-      <header className="py-6 px-4">
+      <header className="py-4 px-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <img src={baseplayLogo} alt="BasePlay Arena" className="h-12 w-12" width={48} height={48} />
-            <div>
-              <h1 className="text-2xl font-black gradient-title">BasePlay Arena</h1>
-              <p className="text-xs text-muted-foreground">Play & Compete on Base</p>
+          <Link to="/" className="flex items-center gap-2 shrink-0">
+            <img src={baseplayLogo} alt="BasePlay Arena" className="h-10 w-10" width={40} height={40} />
+            <div className="hidden sm:block">
+              <h1 className="text-xl font-black gradient-title leading-tight">BasePlay Arena</h1>
+              <p className="text-[10px] text-muted-foreground">Play & Compete on Base</p>
             </div>
           </Link>
-          <div className="flex items-center gap-3">
+
+          {/* Desktop nav */}
+          <div className="hidden sm:flex items-center gap-2">
             {isConnected && (
               <Link to="/profile">
                 <Button variant="ghost" size="sm">
-                  <User className="h-4 w-4 mr-1" />
-                  Profile
+                  <User className="h-4 w-4 mr-1" /> Profile
                 </Button>
               </Link>
             )}
             {isAdmin && (
               <Link to="/admin">
                 <Button variant="ghost" size="sm">
-                  <Shield className="h-4 w-4 mr-1" />
-                  Admin
+                  <Shield className="h-4 w-4 mr-1" /> Admin
                 </Button>
               </Link>
             )}
             <WalletConnect onConnect={() => {}} onDisconnect={() => {}} />
           </div>
+
+          {/* Mobile nav */}
+          <div className="flex sm:hidden items-center gap-2">
+            <WalletConnect onConnect={() => {}} onDisconnect={() => {}} />
+            <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => setMenuOpen(!menuOpen)}>
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
         </div>
+
+        {/* Mobile dropdown */}
+        {menuOpen && (
+          <div className="sm:hidden mt-3 max-w-4xl mx-auto flex flex-col gap-1 bg-card rounded-lg border border-border p-2">
+            {isConnected && (
+              <Link to="/profile" onClick={() => setMenuOpen(false)}>
+                <Button variant="ghost" size="sm" className="w-full justify-start">
+                  <User className="h-4 w-4 mr-2" /> Profile
+                </Button>
+              </Link>
+            )}
+            {isAdmin && (
+              <Link to="/admin" onClick={() => setMenuOpen(false)}>
+                <Button variant="ghost" size="sm" className="w-full justify-start">
+                  <Shield className="h-4 w-4 mr-2" /> Admin
+                </Button>
+              </Link>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Hero */}
