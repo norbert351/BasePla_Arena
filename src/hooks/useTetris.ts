@@ -227,5 +227,6 @@ export const useTetris = () => {
     hardDrop,
     resetGame,
     togglePause: () => setIsPaused(p => !p),
+    setFrozen,
   };
 };
