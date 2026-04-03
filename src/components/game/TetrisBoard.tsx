@@ -53,8 +53,8 @@ export const TetrisBoard = ({ board, disabled, onMoveLeft, onMoveRight, onMoveDo
   }, [touchStart, disabled, onMoveLeft, onMoveRight, onMoveDown, onRotate, onHardDrop]);
 
   return (
-    <div ref={boardRef} className={`bg-game-bg p-2 rounded-xl w-full max-w-[220px] mx-auto ${disabled ? 'pointer-events-none' : ''}`}>
-      <div className="grid grid-cols-10 gap-[1px]" style={{ aspectRatio: '1/1' }}>
+    <div ref={boardRef} className={`bg-game-bg p-1.5 rounded-xl w-full max-w-[260px] mx-auto ${disabled ? 'pointer-events-none' : ''}`}>
+      <div className="grid grid-cols-10 gap-[1px]" style={{ gridTemplateRows: 'repeat(20, 1fr)' }}>
         {board.flat().map((cell, i) => (
           <div
             key={i}
