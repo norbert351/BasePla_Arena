@@ -54,7 +54,7 @@ export const TetrisBoard = ({ board, disabled, onMoveLeft, onMoveRight, onMoveDo
 
   return (
     <div ref={boardRef} className={`bg-game-bg p-2 rounded-xl w-full max-w-[220px] mx-auto ${disabled ? 'pointer-events-none' : ''}`}>
-      <div className="grid grid-cols-10 gap-[1px]" style={{ aspectRatio: '1/1.6' }}>
+      <div className="grid grid-cols-10 gap-[1px]" style={{ aspectRatio: '1/1.2' }}>
         {board.flat().map((cell, i) => (
           <div
             key={i}
