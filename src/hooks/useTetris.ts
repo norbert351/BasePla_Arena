@@ -169,8 +169,8 @@ export const useTetris = () => {
   // Auto-drop with soft drop speed boost
   useEffect(() => {
     if (gameOver || isPaused || frozen) return;
-    const baseSpeed = Math.max(100, 800 - (level - 1) * 70);
-    const speed = softDropping ? Math.max(30, baseSpeed / 4) : baseSpeed;
+    const baseSpeed = Math.max(80, 600 - (level - 1) * 55);
+    const speed = softDropping ? Math.max(25, baseSpeed / 4) : baseSpeed;
     const interval = setInterval(moveDown, speed);
     return () => clearInterval(interval);
   }, [moveDown, level, gameOver, isPaused, frozen, softDropping]);

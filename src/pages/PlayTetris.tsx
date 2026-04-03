@@ -133,8 +133,8 @@ const PlayTetris = () => {
         </div>
       </header>
 
-      <main className="px-4 pb-4">
-        <div className="max-w-md mx-auto space-y-3">
+      <main className="px-3 pb-3">
+        <div className="max-w-sm mx-auto space-y-2">
           <div className="flex items-center justify-between gap-2">
             <ScoreBox label="Score" score={score} />
             <ScoreBox label="Level" score={level} />
