@@ -77,7 +77,8 @@ export const useTetris = () => {
   const [lines, setLines] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [frozen, setFrozen] = useState(true); // frozen until paid
+  const [frozen, setFrozen] = useState(true);
+  const [softDropping, setSoftDropping] = useState(false);
   const pieceRef = useRef(randomPiece());
   const posRef = useRef<Position>({ x: 3, y: -2 });
   const [, forceRender] = useState(0);
@@ -127,7 +128,7 @@ export const useTetris = () => {
       lockPiece();
       return prev;
     });
-  }, [gameOver, isPaused, lockPiece]);
+  }, [gameOver, isPaused, frozen, lockPiece]);
 
   const moveHorizontal = useCallback((dir: -1 | 1) => {
     if (gameOver || isPaused || frozen) return;
@@ -139,7 +140,7 @@ export const useTetris = () => {
       }
       return prev;
     });
-  }, [gameOver, isPaused]);
+  }, [gameOver, isPaused, frozen]);
 
   const rotatePiece = useCallback(() => {
     if (gameOver || isPaused || frozen) return;
@@ -151,7 +152,7 @@ export const useTetris = () => {
       }
       return prev;
     });
-  }, [gameOver, isPaused]);
+  }, [gameOver, isPaused, frozen]);
 
   const hardDrop = useCallback(() => {
     if (gameOver || isPaused || frozen) return;
@@ -163,15 +164,16 @@ export const useTetris = () => {
       lockPiece();
       return prev;
     });
-  }, [gameOver, isPaused, lockPiece]);
+  }, [gameOver, isPaused, frozen, lockPiece]);
 
-  // Auto-drop
+  // Auto-drop with soft drop speed boost
   useEffect(() => {
     if (gameOver || isPaused || frozen) return;
-    const speed = Math.max(100, 800 - (level - 1) * 70);
+    const baseSpeed = Math.max(100, 800 - (level - 1) * 70);
+    const speed = softDropping ? Math.max(30, baseSpeed / 4) : baseSpeed;
     const interval = setInterval(moveDown, speed);
     return () => clearInterval(interval);
-  }, [moveDown, level, gameOver, isPaused, frozen]);
+  }, [moveDown, level, gameOver, isPaused, frozen, softDropping]);
 
   // Keyboard
   useEffect(() => {
@@ -197,6 +199,7 @@ export const useTetris = () => {
     setGameOver(false);
     setIsPaused(false);
     setFrozen(false);
+    setSoftDropping(false);
     spawnPiece();
     rerender();
   }, [spawnPiece]);
@@ -221,12 +224,14 @@ export const useTetris = () => {
     lines,
     gameOver,
     isPaused,
+    softDropping,
     moveDown,
     moveHorizontal,
     rotatePiece,
     hardDrop,
     resetGame,
     togglePause: () => setIsPaused(p => !p),
+    setSoftDropping,
     setFrozen,
   };
 };
