@@ -31,7 +31,6 @@ export const TetrisBoard = ({ board, disabled, onMoveLeft, onMoveRight, onMoveDo
       const dy = e.changedTouches[0].clientY - touchStart.y;
       const elapsed = Date.now() - touchStart.time;
       const minSwipe = 30;
-      // Tap (short touch, small movement) = rotate
       if (Math.abs(dx) < minSwipe && Math.abs(dy) < minSwipe && elapsed < 300) {
         onRotate?.();
       } else if (Math.abs(dx) > Math.abs(dy)) {
@@ -51,15 +50,15 @@ export const TetrisBoard = ({ board, disabled, onMoveLeft, onMoveRight, onMoveDo
       el.removeEventListener('touchmove', handleTouchMove);
       el.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [touchStart, disabled, onMoveLeft, onMoveRight, onMoveDown, onRotate]);
+  }, [touchStart, disabled, onMoveLeft, onMoveRight, onMoveDown, onRotate, onHardDrop]);
 
   return (
-    <div ref={boardRef} className={`bg-game-bg p-2 rounded-xl w-full max-w-[260px] mx-auto ${disabled ? 'pointer-events-none' : ''}`}>
-      <div className="grid grid-cols-10 gap-[1px]" style={{ aspectRatio: '10/20' }}>
+    <div ref={boardRef} className={`bg-game-bg p-2 rounded-xl w-full max-w-[220px] mx-auto ${disabled ? 'pointer-events-none' : ''}`}>
+      <div className="grid grid-cols-10 gap-[1px]" style={{ aspectRatio: '1/1.6' }}>
         {board.flat().map((cell, i) => (
           <div
             key={i}
-            className="rounded-[2px] transition-colors duration-75"
+            className="rounded-[2px]"
             style={{
               backgroundColor: cell || 'hsl(var(--tile-empty))',
               aspectRatio: '1',

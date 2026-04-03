@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTetris } from '@/hooks/useTetris';
 import { TetrisBoard } from '@/components/game/TetrisBoard';
@@ -9,7 +9,7 @@ import { PaymentModal, PaymentToken } from '@/components/game/PaymentModal';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
-import { RotateCcw, Lock, ArrowLeft, Trophy, Pause, Play } from 'lucide-react';
+import { RotateCcw, Lock, ArrowLeft, Trophy, Pause, Play, ChevronsDown, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
 import baseplayLogo from '@/assets/baseplay-logo.png';
@@ -27,7 +27,7 @@ const isCreatorWallet = (address: string | null) =>
   address && CREATOR_WALLETS.includes(address.toLowerCase());
 
 const PlayTetris = () => {
-  const { board, score, level, lines, gameOver, isPaused, moveDown, moveHorizontal, rotatePiece, hardDrop, resetGame, togglePause, setFrozen } = useTetris();
+  const { board, score, level, lines, gameOver, isPaused, softDropping, moveDown, moveHorizontal, rotatePiece, hardDrop, resetGame, togglePause, setSoftDropping, setFrozen } = useTetris();
 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -101,7 +101,6 @@ const PlayTetris = () => {
     else resetGame();
   }, [walletAddress, playerId, resetGame]);
 
-  // Save score on game end
   useEffect(() => {
     if (gameOver && sessionId && walletAddress && score > 0) {
       fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
@@ -116,25 +115,26 @@ const PlayTetris = () => {
   const needsWalletConnection = !walletAddress;
   const needsPayment = walletAddress && !hasPaidForSession && !gameOver;
   const isPlayBlocked = needsWalletConnection || needsPayment;
+  const showControls = walletAddress && hasPaidForSession && !gameOver;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-500/20 via-background to-secondary/30">
-      <header className="py-4 px-4">
+      <header className="py-3 px-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" />
-            <img src={baseplayLogo} alt="BasePlay" className="h-8 w-8" width={32} height={32} />
+            <img src={baseplayLogo} alt="BasePlay" className="h-7 w-7" width={28} height={28} />
           </Link>
-          <h1 className="text-3xl font-black" style={{ background: 'linear-gradient(135deg, hsl(280,65%,55%), hsl(330,80%,55%))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Tetris</h1>
-          <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-black" style={{ background: 'linear-gradient(135deg, hsl(280,65%,55%), hsl(330,80%,55%))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Tetris</h1>
+          <div className="flex items-center gap-1">
             <Link to="/leaderboard/tetris"><Button variant="ghost" size="sm"><Trophy className="h-4 w-4" /></Button></Link>
             <WalletConnect onConnect={handleWalletConnect} onDisconnect={handleWalletDisconnect} onBalanceUpdate={handleBalanceUpdate} />
           </div>
         </div>
       </header>
 
-      <main className="px-4 pb-8">
-        <div className="max-w-md mx-auto space-y-4">
+      <main className="px-4 pb-4">
+        <div className="max-w-md mx-auto space-y-3">
           <div className="flex items-center justify-between gap-2">
             <ScoreBox label="Score" score={score} />
             <ScoreBox label="Level" score={level} />
@@ -142,7 +142,7 @@ const PlayTetris = () => {
           </div>
 
           <div className="flex justify-center gap-2">
-            {walletAddress && hasPaidForSession && !gameOver && (
+            {showControls && (
               <Button variant="outline" size="sm" onClick={togglePause}>
                 {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
                 {isPaused ? 'Resume' : 'Pause'}
@@ -178,8 +178,30 @@ const PlayTetris = () => {
             />
           </div>
 
-          <p className="text-center text-muted-foreground text-sm">
-            Arrow keys to move • ↑ to rotate • Space to drop
+          {/* Mobile controls: hard drop button + speed boost */}
+          {showControls && (
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 max-w-[140px]"
+                onClick={hardDrop}
+              >
+                <ChevronsDown className="h-4 w-4 mr-1" /> Hard Drop
+              </Button>
+              <Button
+                variant={softDropping ? "default" : "outline"}
+                size="sm"
+                className={`flex-1 max-w-[140px] ${softDropping ? 'gradient-primary text-primary-foreground border-none' : ''}`}
+                onClick={() => setSoftDropping(!softDropping)}
+              >
+                <ArrowDown className="h-4 w-4 mr-1" /> {softDropping ? 'Fast ●' : 'Speed Up'}
+              </Button>
+            </div>
+          )}
+
+          <p className="text-center text-muted-foreground text-xs">
+            Tap to rotate • Swipe to move • Swipe down to drop
           </p>
         </div>
       </main>
