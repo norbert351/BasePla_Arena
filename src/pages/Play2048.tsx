@@ -144,6 +144,8 @@ const Play2048 = () => {
 
   const handlePlayAgain = useCallback(() => {
     setScoreSaved(false);
+    setHasPaidForSession(false);
+    setSessionId(null);
     if (walletAddress && playerId) setShowPayment(true);
     else resetGame();
   }, [walletAddress, playerId, resetGame]);

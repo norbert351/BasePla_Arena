@@ -24,7 +24,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate wallet address format
     const walletRegex = /^0x[a-fA-F0-9]{40}$/;
     if (!walletRegex.test(wallet_address)) {
       return new Response(
@@ -33,7 +32,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate score is a non-negative integer
     const parsedScore = parseInt(score);
     if (isNaN(parsedScore) || parsedScore < 0) {
       return new Response(
@@ -45,15 +43,7 @@ Deno.serve(async (req) => {
     // Get the session and verify ownership
     const { data: session, error: sessionError } = await supabase
       .from("game_sessions")
-      .select(`
-        id,
-        player_id,
-        is_active,
-        score,
-        players!inner (
-          wallet_address
-        )
-      `)
+      .select(`id, player_id, is_active, score, game_type, players!inner (wallet_address)`)
       .eq("id", session_id)
       .single();
 
@@ -64,7 +54,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify the wallet address matches the session owner
     const sessionWallet = (session.players as any).wallet_address?.toLowerCase();
     if (sessionWallet !== wallet_address.toLowerCase()) {
       return new Response(
@@ -73,7 +62,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if session is still active
     if (!session.is_active) {
       return new Response(
         JSON.stringify({ error: "Session is no longer active" }),
@@ -81,7 +69,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate score progression (score can only increase, prevents manipulation)
     if (parsedScore < session.score) {
       return new Response(
         JSON.stringify({ error: "Score cannot decrease" }),
@@ -89,9 +76,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Limit score increase per update (prevent unrealistic jumps)
-    // Max 2048 * 4 = 8192 points per move (getting 2048 tile)
-    const maxScoreIncrease = 8192;
+    // Different max score increase for different games
+    const maxScoreIncrease = session.game_type === 'tetris' ? 50000 : 8192;
     if (parsedScore - session.score > maxScoreIncrease) {
       console.warn(`Suspicious score increase: ${session.score} -> ${parsedScore} for session ${session_id}`);
       return new Response(
@@ -120,10 +106,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If save_to_leaderboard is requested, upsert into leaderboard (only if higher)
+    // Save to leaderboard — compare against ALL-TIME high score (no week filter)
     if (save_to_leaderboard && end_game) {
       const now = new Date();
-      // Calculate current week boundaries (Monday to Sunday)
       const dayOfWeek = now.getUTCDay();
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
       const weekStart = new Date(now);
@@ -132,35 +117,43 @@ Deno.serve(async (req) => {
       const weekEnd = new Date(weekStart);
       weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
       weekEnd.setUTCHours(23, 59, 59, 999);
-
       const weekStartStr = weekStart.toISOString().split('T')[0];
       const weekEndStr = weekEnd.toISOString().split('T')[0];
 
-      // Check existing leaderboard entry for this player & week
-      const { data: existing } = await supabase
+      // Check ALL-TIME best for this player (across all weeks)
+      const { data: allTimeBest } = await supabase
         .from("leaderboard")
         .select("id, high_score")
         .eq("player_id", session.player_id)
-        .eq("week_start", weekStartStr)
+        .order("high_score", { ascending: false })
+        .limit(1)
         .single();
 
-      if (existing) {
-        // Only update if new score is higher
-        if (parsedScore > existing.high_score) {
+      // Only save if this score is higher than all-time best (or no entry exists)
+      if (!allTimeBest || parsedScore > allTimeBest.high_score) {
+        // Check if there's an entry for this week
+        const { data: weekEntry } = await supabase
+          .from("leaderboard")
+          .select("id")
+          .eq("player_id", session.player_id)
+          .eq("week_start", weekStartStr)
+          .single();
+
+        if (weekEntry) {
           await supabase
             .from("leaderboard")
             .update({ high_score: parsedScore, updated_at: now.toISOString() })
-            .eq("id", existing.id);
+            .eq("id", weekEntry.id);
+        } else {
+          await supabase
+            .from("leaderboard")
+            .insert({
+              player_id: session.player_id,
+              high_score: parsedScore,
+              week_start: weekStartStr,
+              week_end: weekEndStr,
+            });
         }
-      } else {
-        await supabase
-          .from("leaderboard")
-          .insert({
-            player_id: session.player_id,
-            high_score: parsedScore,
-            week_start: weekStartStr,
-            week_end: weekEndStr,
-          });
       }
     }
 

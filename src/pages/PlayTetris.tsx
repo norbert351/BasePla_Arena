@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTetris } from '@/hooks/useTetris';
 import { TetrisBoard } from '@/components/game/TetrisBoard';
 import { ScoreBox } from '@/components/game/ScoreBox';
 import { WalletConnect } from '@/components/game/WalletConnect';
 import { GameOverModal } from '@/components/game/GameOverModal';
 import { PaymentModal, PaymentToken } from '@/components/game/PaymentModal';
+import { ExitGameModal } from '@/components/game/ExitGameModal';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
@@ -28,6 +29,7 @@ const isCreatorWallet = (address: string | null) =>
 
 const PlayTetris = () => {
   const { board, score, level, lines, gameOver, isPaused, softDropping, moveDown, moveHorizontal, rotatePiece, hardDrop, resetGame, togglePause, setSoftDropping, setFrozen } = useTetris();
+  const navigate = useNavigate();
 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -40,8 +42,10 @@ const PlayTetris = () => {
   const [dynamicEthFee, setDynamicEthFee] = useState<string | null>(null);
   const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null);
   const [scoreSaved, setScoreSaved] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
 
   const isCreator = isCreatorWallet(walletAddress);
+  const isGameActive = hasPaidForSession && !gameOver && sessionId;
 
   useEffect(() => {
     const fetchEthFee = async () => {
@@ -90,7 +94,7 @@ const PlayTetris = () => {
       if (!response.ok) throw new Error(result.error);
 
       setSessionId(result.session_id); setPlayerId(result.player_id);
-      setHasPaidForSession(true); resetGame(); setShowPayment(false);
+      setHasPaidForSession(true); setScoreSaved(false); resetGame(); setShowPayment(false);
       toast.success('Game started!');
     } catch (error: any) {
       toast.error(error.message || 'Payment failed');
@@ -99,12 +103,28 @@ const PlayTetris = () => {
 
   const handlePlayAgain = useCallback(() => {
     setScoreSaved(false);
+    setHasPaidForSession(false);
+    setSessionId(null);
     if (walletAddress && playerId) setShowPayment(true);
     else resetGame();
   }, [walletAddress, playerId, resetGame]);
 
+  const endSession = useCallback(async (saveScore: boolean) => {
+    if (sessionId && walletAddress && score >= 0) {
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true, save_to_leaderboard: saveScore }),
+        });
+      } catch (e) { console.error(e); }
+    }
+    setHasPaidForSession(false);
+    setSessionId(null);
+  }, [sessionId, walletAddress, score]);
+
   const handleSaveScore = useCallback(async (): Promise<boolean> => {
-    if (!sessionId || !walletAddress || score <= 0) return false;
+    if (!sessionId || !walletAddress) return false;
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
         method: 'POST',
@@ -113,6 +133,7 @@ const PlayTetris = () => {
       });
       if (res.ok) {
         setScoreSaved(true);
+        setHasPaidForSession(false);
         toast.success('Score saved to leaderboard!');
         return true;
       }
@@ -121,16 +142,53 @@ const PlayTetris = () => {
     return false;
   }, [sessionId, walletAddress, score]);
 
+  // Auto end session on game over
   useEffect(() => {
-    if (gameOver && sessionId && walletAddress && score > 0) {
+    if (gameOver && sessionId && walletAddress) {
       fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true }),
       }).catch(console.error);
-      setHasPaidForSession(false);
     }
   }, [gameOver, sessionId, walletAddress, score]);
+
+  // Handle back button click - show exit modal if game active
+  const handleBackClick = useCallback((e: React.MouseEvent) => {
+    if (isGameActive) {
+      e.preventDefault();
+      togglePause(); // pause game
+      setShowExitModal(true);
+    }
+  }, [isGameActive, togglePause]);
+
+  const handleExitCancel = useCallback(() => {
+    setShowExitModal(false);
+    if (isPaused) togglePause(); // resume
+  }, [isPaused, togglePause]);
+
+  const handleSaveAndExit = useCallback(async () => {
+    await endSession(true);
+    setShowExitModal(false);
+    toast.success('Score saved!');
+    navigate('/');
+  }, [endSession, navigate]);
+
+  const handleExitWithoutSaving = useCallback(async () => {
+    await endSession(false);
+    setShowExitModal(false);
+    navigate('/');
+  }, [endSession, navigate]);
+
+  // Browser back button / beforeunload
+  useEffect(() => {
+    if (!isGameActive) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isGameActive]);
 
   const needsWalletConnection = !walletAddress;
   const needsPayment = walletAddress && !hasPaidForSession && !gameOver;
@@ -141,7 +199,7 @@ const PlayTetris = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-500/20 via-background to-secondary/30">
       <header className="py-3 px-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/" onClick={handleBackClick} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" />
             <img src={baseplayLogo} alt="BasePlay" className="h-7 w-7" width={28} height={28} />
           </Link>
@@ -198,15 +256,9 @@ const PlayTetris = () => {
             />
           </div>
 
-          {/* Mobile controls: hard drop button + speed boost */}
           {showControls && (
             <div className="flex items-center justify-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 max-w-[140px]"
-                onClick={hardDrop}
-              >
+              <Button variant="outline" size="sm" className="flex-1 max-w-[140px]" onClick={hardDrop}>
                 <ChevronsDown className="h-4 w-4 mr-1" /> Hard Drop
               </Button>
               <Button
@@ -231,6 +283,13 @@ const PlayTetris = () => {
         feeETH={isCreator ? CREATOR_FEE_ETH : dynamicEthFee ?? '0.00040000'} feeUSDC={GAME_FEE_USDC}
         balanceETH={balanceETH} balanceUSDC={balanceUSDC} isLoading={isProcessing}
         isCreator={isCreator} ethPriceUsd={ethPriceUsd ?? undefined}
+      />
+      <ExitGameModal
+        isOpen={showExitModal}
+        score={score}
+        onCancel={handleExitCancel}
+        onSaveAndExit={handleSaveAndExit}
+        onExitWithoutSaving={handleExitWithoutSaving}
       />
     </div>
   );
