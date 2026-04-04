@@ -9,7 +9,7 @@ import { PaymentModal, PaymentToken } from '@/components/game/PaymentModal';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
-import { RotateCcw, Lock, ArrowLeft, Trophy } from 'lucide-react';
+import { RotateCcw, Lock, ArrowLeft, Trophy, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
 import baseplayLogo from '@/assets/baseplay-logo.png';
