@@ -39,6 +39,7 @@ const PlayTetris = () => {
   const [hasPaidForSession, setHasPaidForSession] = useState(false);
   const [dynamicEthFee, setDynamicEthFee] = useState<string | null>(null);
   const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null);
+  const [scoreSaved, setScoreSaved] = useState(false);
 
   const isCreator = isCreatorWallet(walletAddress);
 
