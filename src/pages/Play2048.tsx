@@ -9,7 +9,7 @@ import { PaymentModal, PaymentToken } from '@/components/game/PaymentModal';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
-import { RotateCcw, Lock, ArrowLeft, Trophy } from 'lucide-react';
+import { RotateCcw, Lock, ArrowLeft, Trophy, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
 import baseplayLogo from '@/assets/baseplay-logo.png';
@@ -39,6 +39,7 @@ const Play2048 = () => {
   const [hasPaidForSession, setHasPaidForSession] = useState(false);
   const [dynamicEthFee, setDynamicEthFee] = useState<string | null>(null);
   const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null);
+  const [scoreSaved, setScoreSaved] = useState(false);
 
   const isCreator = isCreatorWallet(walletAddress);
 
@@ -142,9 +143,28 @@ const Play2048 = () => {
   }, [walletAddress, isCreator, dynamicEthFee, resetGame]);
 
   const handlePlayAgain = useCallback(() => {
+    setScoreSaved(false);
     if (walletAddress && playerId) setShowPayment(true);
     else resetGame();
   }, [walletAddress, playerId, resetGame]);
+
+  const handleSaveScore = useCallback(async (): Promise<boolean> => {
+    if (!sessionId || !walletAddress || score <= 0) return false;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true, save_to_leaderboard: true }),
+      });
+      if (res.ok) {
+        setScoreSaved(true);
+        toast.success('Score saved to leaderboard!');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    toast.error('Failed to save score');
+    return false;
+  }, [sessionId, walletAddress, score]);
 
   const prevScoreRef = useRef(score);
 
@@ -237,7 +257,7 @@ const Play2048 = () => {
         </div>
       </main>
 
-      <GameOverModal isOpen={gameOver || (won && !gameOver)} score={score} won={won} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} />
+      <GameOverModal isOpen={gameOver || (won && !gameOver)} score={score} won={won} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} onSaveScore={sessionId ? handleSaveScore : undefined} scoreSaved={scoreSaved} />
       <PaymentModal
         isOpen={showPayment} onClose={() => setShowPayment(false)} onPay={startNewGame}
         feeETH={isCreator ? CREATOR_FEE_ETH : dynamicEthFee ?? '0.00040000'} feeUSDC={GAME_FEE_USDC}

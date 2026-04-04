@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { session_id, wallet_address, score, end_game } = await req.json();
+    const { session_id, wallet_address, score, end_game, save_to_leaderboard } = await req.json();
 
     if (!session_id || !wallet_address || score === undefined) {
       return new Response(
@@ -118,6 +118,50 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "Failed to update score" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // If save_to_leaderboard is requested, upsert into leaderboard (only if higher)
+    if (save_to_leaderboard && end_game) {
+      const now = new Date();
+      // Calculate current week boundaries (Monday to Sunday)
+      const dayOfWeek = now.getUTCDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const weekStart = new Date(now);
+      weekStart.setUTCDate(now.getUTCDate() + mondayOffset);
+      weekStart.setUTCHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+      weekEnd.setUTCHours(23, 59, 59, 999);
+
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+      const weekEndStr = weekEnd.toISOString().split('T')[0];
+
+      // Check existing leaderboard entry for this player & week
+      const { data: existing } = await supabase
+        .from("leaderboard")
+        .select("id, high_score")
+        .eq("player_id", session.player_id)
+        .eq("week_start", weekStartStr)
+        .single();
+
+      if (existing) {
+        // Only update if new score is higher
+        if (parsedScore > existing.high_score) {
+          await supabase
+            .from("leaderboard")
+            .update({ high_score: parsedScore, updated_at: now.toISOString() })
+            .eq("id", existing.id);
+        }
+      } else {
+        await supabase
+          .from("leaderboard")
+          .insert({
+            player_id: session.player_id,
+            high_score: parsedScore,
+            week_start: weekStartStr,
+            week_end: weekEndStr,
+          });
+      }
     }
 
     return new Response(

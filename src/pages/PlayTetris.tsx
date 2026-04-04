@@ -39,6 +39,7 @@ const PlayTetris = () => {
   const [hasPaidForSession, setHasPaidForSession] = useState(false);
   const [dynamicEthFee, setDynamicEthFee] = useState<string | null>(null);
   const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null);
+  const [scoreSaved, setScoreSaved] = useState(false);
 
   const isCreator = isCreatorWallet(walletAddress);
 
@@ -97,9 +98,28 @@ const PlayTetris = () => {
   }, [walletAddress, isCreator, dynamicEthFee, resetGame]);
 
   const handlePlayAgain = useCallback(() => {
+    setScoreSaved(false);
     if (walletAddress && playerId) setShowPayment(true);
     else resetGame();
   }, [walletAddress, playerId, resetGame]);
+
+  const handleSaveScore = useCallback(async (): Promise<boolean> => {
+    if (!sessionId || !walletAddress || score <= 0) return false;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true, save_to_leaderboard: true }),
+      });
+      if (res.ok) {
+        setScoreSaved(true);
+        toast.success('Score saved to leaderboard!');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    toast.error('Failed to save score');
+    return false;
+  }, [sessionId, walletAddress, score]);
 
   useEffect(() => {
     if (gameOver && sessionId && walletAddress && score > 0) {
@@ -206,7 +226,7 @@ const PlayTetris = () => {
         </div>
       </main>
 
-      <GameOverModal isOpen={gameOver} score={score} won={false} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} />
+      <GameOverModal isOpen={gameOver} score={score} won={false} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} onSaveScore={sessionId ? handleSaveScore : undefined} scoreSaved={scoreSaved} />
       <PaymentModal isOpen={showPayment} onClose={() => setShowPayment(false)} onPay={startNewGame}
         feeETH={isCreator ? CREATOR_FEE_ETH : dynamicEthFee ?? '0.00040000'} feeUSDC={GAME_FEE_USDC}
         balanceETH={balanceETH} balanceUSDC={balanceUSDC} isLoading={isProcessing}

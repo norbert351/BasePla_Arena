@@ -3,8 +3,15 @@ import { Gamepad2, Trophy, User, Shield, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WalletConnect } from '@/components/game/WalletConnect';
 import { useAccount } from 'wagmi';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import baseplayLogo from '@/assets/baseplay-logo.png';
+
+// Preload game pages when user lands on homepage
+const preloadGames = () => {
+  import('../pages/Play2048');
+  import('../pages/PlayTetris');
+};
+
 
 const CREATOR_WALLETS = [
   '0xadf983e3d07d6abf344e1923f1d2164d8dffd816',
@@ -34,6 +41,12 @@ const Home = () => {
   const { isConnected, address } = useAccount();
   const isAdmin = isConnected && address && CREATOR_WALLETS.includes(address.toLowerCase());
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Preload game chunks after homepage renders
+  useEffect(() => {
+    const timer = setTimeout(preloadGames, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
@@ -104,7 +117,7 @@ const Home = () => {
             Play. Compete. Win.
           </h2>
           <p className="text-lg text-muted-foreground max-w-lg mx-auto mb-8">
-            Pay $0.99 per session. Top players share the reward pool. All on Base.
+            Play 2048 and Tetris, Rank up on Leaderboard, and earn from a community driven reward pool.
           </p>
         </div>
       </section>
