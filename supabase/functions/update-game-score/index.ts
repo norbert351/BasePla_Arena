@@ -120,6 +120,50 @@ Deno.serve(async (req) => {
       );
     }
 
+    // If save_to_leaderboard is requested, upsert into leaderboard (only if higher)
+    if (save_to_leaderboard && end_game) {
+      const now = new Date();
+      // Calculate current week boundaries (Monday to Sunday)
+      const dayOfWeek = now.getUTCDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const weekStart = new Date(now);
+      weekStart.setUTCDate(now.getUTCDate() + mondayOffset);
+      weekStart.setUTCHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+      weekEnd.setUTCHours(23, 59, 59, 999);
+
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+      const weekEndStr = weekEnd.toISOString().split('T')[0];
+
+      // Check existing leaderboard entry for this player & week
+      const { data: existing } = await supabase
+        .from("leaderboard")
+        .select("id, high_score")
+        .eq("player_id", session.player_id)
+        .eq("week_start", weekStartStr)
+        .single();
+
+      if (existing) {
+        // Only update if new score is higher
+        if (parsedScore > existing.high_score) {
+          await supabase
+            .from("leaderboard")
+            .update({ high_score: parsedScore, updated_at: now.toISOString() })
+            .eq("id", existing.id);
+        }
+      } else {
+        await supabase
+          .from("leaderboard")
+          .insert({
+            player_id: session.player_id,
+            high_score: parsedScore,
+            week_start: weekStartStr,
+            week_end: weekEndStr,
+          });
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, score: parsedScore }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
