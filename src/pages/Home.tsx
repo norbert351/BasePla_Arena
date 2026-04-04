@@ -42,6 +42,12 @@ const Home = () => {
   const isAdmin = isConnected && address && CREATOR_WALLETS.includes(address.toLowerCase());
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Preload game chunks after homepage renders
+  useEffect(() => {
+    const timer = setTimeout(preloadGames, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
       {/* Header */}
