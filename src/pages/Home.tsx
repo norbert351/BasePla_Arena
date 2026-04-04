@@ -117,7 +117,7 @@ const Home = () => {
             Play. Compete. Win.
           </h2>
           <p className="text-lg text-muted-foreground max-w-lg mx-auto mb-8">
-            Pay $0.99 per session. Top players share the reward pool. All on Base.
+            Play 2048 and Tetris, Rank up on Leaderboard, and earn from a community driven reward pool.
           </p>
         </div>
       </section>
