@@ -257,7 +257,7 @@ const Play2048 = () => {
         </div>
       </main>
 
-      <GameOverModal isOpen={gameOver || (won && !gameOver)} score={score} won={won} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} />
+      <GameOverModal isOpen={gameOver || (won && !gameOver)} score={score} won={won} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} onSaveScore={sessionId ? handleSaveScore : undefined} scoreSaved={scoreSaved} />
       <PaymentModal
         isOpen={showPayment} onClose={() => setShowPayment(false)} onPay={startNewGame}
         feeETH={isCreator ? CREATOR_FEE_ETH : dynamicEthFee ?? '0.00040000'} feeUSDC={GAME_FEE_USDC}
