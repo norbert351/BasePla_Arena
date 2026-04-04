@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { session_id, wallet_address, score, end_game } = await req.json();
+    const { session_id, wallet_address, score, end_game, save_to_leaderboard } = await req.json();
 
     if (!session_id || !wallet_address || score === undefined) {
       return new Response(
