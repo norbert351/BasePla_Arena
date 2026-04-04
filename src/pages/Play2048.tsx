@@ -143,9 +143,28 @@ const Play2048 = () => {
   }, [walletAddress, isCreator, dynamicEthFee, resetGame]);
 
   const handlePlayAgain = useCallback(() => {
+    setScoreSaved(false);
     if (walletAddress && playerId) setShowPayment(true);
     else resetGame();
   }, [walletAddress, playerId, resetGame]);
+
+  const handleSaveScore = useCallback(async (): Promise<boolean> => {
+    if (!sessionId || !walletAddress || score <= 0) return false;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true, save_to_leaderboard: true }),
+      });
+      if (res.ok) {
+        setScoreSaved(true);
+        toast.success('Score saved to leaderboard!');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    toast.error('Failed to save score');
+    return false;
+  }, [sessionId, walletAddress, score]);
 
   const prevScoreRef = useRef(score);
 
