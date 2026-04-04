@@ -3,8 +3,15 @@ import { Gamepad2, Trophy, User, Shield, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WalletConnect } from '@/components/game/WalletConnect';
 import { useAccount } from 'wagmi';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import baseplayLogo from '@/assets/baseplay-logo.png';
+
+// Preload game pages when user lands on homepage
+const preloadGames = () => {
+  import('../pages/Play2048');
+  import('../pages/PlayTetris');
+};
+
 
 const CREATOR_WALLETS = [
   '0xadf983e3d07d6abf344e1923f1d2164d8dffd816',
