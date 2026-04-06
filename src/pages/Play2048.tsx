@@ -249,7 +249,7 @@ const Play2048 = () => {
                 )}
               </div>
             )}
-            <GameBoard grid={grid} onMove={move} disabled={!!isPlayBlocked} />
+            <GameBoard grid={grid} onMove={move} disabled={isPlayBlocked} />
           </div>
 
           <p className="text-center text-muted-foreground text-sm">
