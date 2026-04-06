@@ -7,9 +7,9 @@ import { WalletConnect } from '@/components/game/WalletConnect';
 import { GameOverModal } from '@/components/game/GameOverModal';
 import { PaymentModal, PaymentToken } from '@/components/game/PaymentModal';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
-import { RotateCcw, Lock, ArrowLeft, Trophy, Save } from 'lucide-react';
+import { hasSufficientBalance, refreshWalletBalances, validateActiveGameSession } from '@/lib/session-access';
+import { RotateCcw, Lock, ArrowLeft, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
 import baseplayLogo from '@/assets/baseplay-logo.png';
@@ -26,22 +26,25 @@ const CREATOR_WALLETS = [
 const isCreatorWallet = (address: string | null) =>
   address && CREATOR_WALLETS.includes(address.toLowerCase());
 
+type SessionStatus = 'checking' | 'locked' | 'active';
+
 const Play2048 = () => {
   const { grid, score, gameOver, won, moveCount, move, resetGame } = use2048();
 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [playerId, setPlayerId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [balanceETH, setBalanceETH] = useState('0');
   const [balanceUSDC, setBalanceUSDC] = useState('0');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [hasPaidForSession, setHasPaidForSession] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus>('locked');
   const [dynamicEthFee, setDynamicEthFee] = useState<string | null>(null);
   const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null);
   const [scoreSaved, setScoreSaved] = useState(false);
 
   const isCreator = isCreatorWallet(walletAddress);
+  const hasActiveSession = sessionStatus === 'active';
+  const isCheckingSession = sessionStatus === 'checking';
 
   useEffect(() => {
     const fetchEthFee = async () => {
@@ -66,24 +69,61 @@ const Play2048 = () => {
     setBalanceUSDC(usdcBal);
   }, []);
 
+  const syncBalances = useCallback(async (address: string) => {
+    const balances = await refreshWalletBalances(address);
+    setBalanceETH(balances.ethBalance);
+    setBalanceUSDC(balances.usdcBalance);
+    return balances;
+  }, []);
+
+  const validateSession = useCallback(async (address: string) => {
+    setSessionStatus('checking');
+
+    try {
+      const result = await validateActiveGameSession(address, '2048');
+      console.info('[2048] session validation', {
+        walletAddress: address,
+        sessionId: result.session_id,
+        validationResult: result.valid,
+      });
+
+      if (result.valid && result.session_id) {
+        setSessionId(result.session_id);
+        setSessionStatus('active');
+        return result;
+      }
+
+      setSessionId(null);
+      setSessionStatus('locked');
+      return result;
+    } catch (error) {
+      console.error('[2048] session validation failed', error);
+      setSessionId(null);
+      setSessionStatus('locked');
+      return { valid: false, session_id: null, player_id: null, reason: null };
+    }
+  }, []);
+
   const handleWalletConnect = useCallback(async (address: string) => {
     setWalletAddress(address);
-    const { data: existingPlayer } = await supabase
-      .from('players')
-      .select('id')
-      .eq('wallet_address', address.toLowerCase())
-      .single();
-    if (existingPlayer) setPlayerId(existingPlayer.id);
-  }, []);
+    await Promise.all([syncBalances(address), validateSession(address)]);
+  }, [syncBalances, validateSession]);
 
   const handleWalletDisconnect = useCallback(() => {
     setWalletAddress(null);
-    setPlayerId(null);
     setSessionId(null);
     setBalanceETH('0');
     setBalanceUSDC('0');
-    setHasPaidForSession(false);
+    setSessionStatus('locked');
   }, []);
+
+  useEffect(() => {
+    if (!showPayment || !walletAddress) return;
+
+    syncBalances(walletAddress).catch((error) => {
+      console.error('[2048] failed to refresh balances before payment', error);
+    });
+  }, [showPayment, walletAddress, syncBalances]);
 
   const startNewGame = useCallback(async (token: PaymentToken) => {
     if (!walletAddress) { toast.error('Please connect your wallet first'); return; }
@@ -92,6 +132,22 @@ const Play2048 = () => {
       const isCreatorPayment = isCreator;
       const feeAmount = isCreatorPayment ? CREATOR_FEE_ETH : token === 'ETH' ? dynamicEthFee ?? '0.00040000' : GAME_FEE_USDC;
       const paymentToken = isCreatorPayment ? 'ETH' : token;
+      const balances = await syncBalances(walletAddress);
+      const availableBalance = paymentToken === 'ETH' ? balances.ethBalance : balances.usdcBalance;
+      const validationResult = hasSufficientBalance(paymentToken, feeAmount, balances);
+
+      console.info('[2048] pre-play balance check', {
+        walletAddress,
+        token: paymentToken,
+        walletBalance: availableBalance,
+        requiredFee: feeAmount,
+        validationResult,
+      });
+
+      if (!validationResult) {
+        toast.error('Insufficient balance to start a new session');
+        return;
+      }
 
       toast.info(isCreatorPayment
         ? `Creator verification: Sending ${feeAmount} ETH...`
@@ -124,10 +180,15 @@ const Play2048 = () => {
       if (!response.ok) throw new Error(result.error || 'Failed to create game session');
 
       setSessionId(result.session_id);
-      setPlayerId(result.player_id);
-      setHasPaidForSession(true);
+      setSessionStatus('active');
+      setScoreSaved(false);
       resetGame();
       setShowPayment(false);
+      console.info('[2048] session unlocked after payment', {
+        walletAddress,
+        txHash,
+        sessionId: result.session_id,
+      });
       toast.success(isCreatorPayment ? 'Creator verified! Game started!' : 'Game started! Good luck!');
     } catch (error: any) {
       console.error('Failed to start game:', error);
@@ -140,15 +201,15 @@ const Play2048 = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [walletAddress, isCreator, dynamicEthFee, resetGame]);
+  }, [walletAddress, isCreator, dynamicEthFee, resetGame, syncBalances]);
 
   const handlePlayAgain = useCallback(() => {
     setScoreSaved(false);
-    setHasPaidForSession(false);
+    setSessionStatus('locked');
     setSessionId(null);
-    if (walletAddress && playerId) setShowPayment(true);
+    if (walletAddress) setShowPayment(true);
     else resetGame();
-  }, [walletAddress, playerId, resetGame]);
+  }, [walletAddress, resetGame]);
 
   const handleSaveScore = useCallback(async (): Promise<boolean> => {
     if (!sessionId || !walletAddress || score <= 0) return false;
@@ -171,7 +232,7 @@ const Play2048 = () => {
   const prevScoreRef = useRef(score);
 
   const handleGameEnd = useCallback(async () => {
-    if (sessionId && walletAddress && score > 0) {
+    if (sessionId && walletAddress) {
       try {
         await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
           method: 'POST',
@@ -179,12 +240,12 @@ const Play2048 = () => {
           body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true }),
         });
       } catch (error) { console.error('Failed to save score:', error); }
-      setHasPaidForSession(false);
+      setSessionStatus('locked');
     }
   }, [sessionId, walletAddress, score]);
 
   useEffect(() => {
-    if (sessionId && walletAddress && hasPaidForSession && score > prevScoreRef.current + 500) {
+    if (sessionId && walletAddress && hasActiveSession && score > prevScoreRef.current + 500) {
       prevScoreRef.current = score;
       fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
         method: 'POST',
@@ -192,15 +253,15 @@ const Play2048 = () => {
         body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: false }),
       }).catch(console.error);
     }
-  }, [sessionId, walletAddress, hasPaidForSession, score]);
+  }, [sessionId, walletAddress, hasActiveSession, score]);
 
   useEffect(() => {
-    if ((gameOver || won) && sessionId) handleGameEnd();
-  }, [gameOver, won, sessionId, handleGameEnd]);
+    if ((gameOver || won) && sessionId && hasActiveSession) handleGameEnd();
+  }, [gameOver, won, sessionId, hasActiveSession, handleGameEnd]);
 
   const needsWalletConnection = !walletAddress;
-  const needsPayment = walletAddress && !hasPaidForSession;
-  const isPlayBlocked = needsWalletConnection || !!needsPayment;
+  const needsPayment = walletAddress && sessionStatus === 'locked';
+  const isPlayBlocked = needsWalletConnection || isCheckingSession || !!needsPayment;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
@@ -224,7 +285,7 @@ const Play2048 = () => {
         <div className="max-w-md mx-auto space-y-4">
           <div className="flex items-center justify-between">
             <ScoreBox label="Score" score={score} />
-            {walletAddress && hasPaidForSession && (
+            {walletAddress && hasActiveSession && (
               <Button variant="outline" size="sm" onClick={() => setShowPayment(true)} className="gradient-primary text-primary-foreground border-none">
                 <RotateCcw className="mr-1 h-4 w-4" /> New Game
               </Button>
@@ -235,15 +296,20 @@ const Play2048 = () => {
             {isPlayBlocked && (
               <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center rounded-xl">
                 <Lock className="h-12 w-12 text-primary mb-4" />
-                {needsWalletConnection ? (
+                {isCheckingSession ? (
+                  <>
+                    <p className="text-lg font-semibold mb-2">Checking Session</p>
+                    <p className="text-sm text-muted-foreground">Validating your latest paid session...</p>
+                  </>
+                ) : needsWalletConnection ? (
                   <>
                     <p className="text-lg font-semibold mb-2">Connect Wallet to Play</p>
                     <WalletConnect onConnect={handleWalletConnect} onDisconnect={handleWalletDisconnect} onBalanceUpdate={handleBalanceUpdate} />
                   </>
                 ) : (
                   <>
-                    <p className="text-lg font-semibold mb-2">Pay to Play</p>
-                    <p className="text-sm text-muted-foreground mb-4">Unlock with $0.99</p>
+                    <p className="text-lg font-semibold mb-2">New Session Required</p>
+                    <p className="text-sm text-muted-foreground mb-4">You need to start a new session to play</p>
                     <Button onClick={() => setShowPayment(true)} className="gradient-gold text-accent-foreground">Pay Entry Fee</Button>
                   </>
                 )}
