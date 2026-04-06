@@ -219,6 +219,13 @@ Deno.serve(async (req) => {
       playerId = newPlayer.id;
     }
 
+    // Deactivate any existing active sessions for this player (enforce one session at a time)
+    await supabase
+      .from("game_sessions")
+      .update({ is_active: false, ended_at: new Date().toISOString() })
+      .eq("player_id", playerId)
+      .eq("is_active", true);
+
     // Create game session with tx_hash for verification
     const validGameType = ['2048', 'tetris'].includes(game_type) ? game_type : '2048';
 
