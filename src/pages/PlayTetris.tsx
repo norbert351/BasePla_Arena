@@ -191,8 +191,8 @@ const PlayTetris = () => {
   }, [isGameActive]);
 
   const needsWalletConnection = !walletAddress;
-  const needsPayment = walletAddress && !hasPaidForSession && !gameOver;
-  const isPlayBlocked = needsWalletConnection || needsPayment;
+  const needsPayment = walletAddress && !hasPaidForSession;
+  const isPlayBlocked = needsWalletConnection || !!needsPayment;
   const showControls = walletAddress && hasPaidForSession && !gameOver;
 
   return (

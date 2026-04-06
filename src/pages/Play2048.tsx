@@ -199,8 +199,8 @@ const Play2048 = () => {
   }, [gameOver, won, sessionId, handleGameEnd]);
 
   const needsWalletConnection = !walletAddress;
-  const needsPayment = walletAddress && !hasPaidForSession && !gameOver && !won;
-  const isPlayBlocked = needsWalletConnection || needsPayment;
+  const needsPayment = walletAddress && !hasPaidForSession;
+  const isPlayBlocked = needsWalletConnection || !!needsPayment;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
