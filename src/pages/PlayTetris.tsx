@@ -47,6 +47,11 @@ const PlayTetris = () => {
   const isCreator = isCreatorWallet(walletAddress);
   const isGameActive = hasPaidForSession && !gameOver && sessionId;
 
+  // Keep board frozen until paid
+  useEffect(() => {
+    setFrozen(!hasPaidForSession);
+  }, [hasPaidForSession, setFrozen]);
+
   useEffect(() => {
     const fetchEthFee = async () => {
       try {
@@ -191,8 +196,8 @@ const PlayTetris = () => {
   }, [isGameActive]);
 
   const needsWalletConnection = !walletAddress;
-  const needsPayment = walletAddress && !hasPaidForSession && !gameOver;
-  const isPlayBlocked = needsWalletConnection || needsPayment;
+  const needsPayment = walletAddress && !hasPaidForSession;
+  const isPlayBlocked = needsWalletConnection || !!needsPayment;
   const showControls = walletAddress && hasPaidForSession && !gameOver;
 
   return (
