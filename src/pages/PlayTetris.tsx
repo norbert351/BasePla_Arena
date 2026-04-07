@@ -10,6 +10,7 @@ import { ExitGameModal } from '@/components/game/ExitGameModal';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
+import { hasSufficientBalance, refreshWalletBalances, validateActiveGameSession } from '@/lib/session-access';
 import { RotateCcw, Lock, ArrowLeft, Trophy, Pause, Play, ChevronsDown, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
@@ -27,6 +28,8 @@ const CREATOR_WALLETS = [
 const isCreatorWallet = (address: string | null) =>
   address && CREATOR_WALLETS.includes(address.toLowerCase());
 
+type SessionStatus = 'checking' | 'locked' | 'active';
+
 const PlayTetris = () => {
   const { board, score, level, lines, gameOver, isPaused, softDropping, moveDown, moveHorizontal, rotatePiece, hardDrop, resetGame, togglePause, setSoftDropping, setFrozen } = useTetris();
   const navigate = useNavigate();
@@ -38,19 +41,21 @@ const PlayTetris = () => {
   const [balanceETH, setBalanceETH] = useState('0');
   const [balanceUSDC, setBalanceUSDC] = useState('0');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [hasPaidForSession, setHasPaidForSession] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus>('locked');
   const [dynamicEthFee, setDynamicEthFee] = useState<string | null>(null);
   const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null);
   const [scoreSaved, setScoreSaved] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
 
   const isCreator = isCreatorWallet(walletAddress);
-  const isGameActive = hasPaidForSession && !gameOver && sessionId;
+  const hasActiveSession = sessionStatus === 'active';
+  const isCheckingSession = sessionStatus === 'checking';
+  const isGameActive = hasActiveSession && !gameOver && sessionId;
 
   // Keep board frozen until paid
   useEffect(() => {
-    setFrozen(!hasPaidForSession);
-  }, [hasPaidForSession, setFrozen]);
+    setFrozen(!hasActiveSession);
+  }, [hasActiveSession, setFrozen]);
 
   useEffect(() => {
     const fetchEthFee = async () => {
@@ -67,16 +72,54 @@ const PlayTetris = () => {
 
   const handleBalanceUpdate = useCallback((ethBal: string, usdcBal: string) => { setBalanceETH(ethBal); setBalanceUSDC(usdcBal); }, []);
 
+  const syncBalances = useCallback(async (address: string) => {
+    const balances = await refreshWalletBalances(address);
+    setBalanceETH(balances.ethBalance);
+    setBalanceUSDC(balances.usdcBalance);
+    return balances;
+  }, []);
+
+  const validateSession = useCallback(async (address: string) => {
+    setSessionStatus('checking');
+    try {
+      const result = await validateActiveGameSession(address, 'tetris');
+      console.info('[Tetris] session validation', { walletAddress: address, sessionId: result.session_id, valid: result.valid });
+
+      if (result.valid && result.session_id) {
+        setSessionId(result.session_id);
+        if (result.player_id) setPlayerId(result.player_id);
+        setSessionStatus('active');
+        return result;
+      }
+      setSessionId(null);
+      setSessionStatus('locked');
+      return result;
+    } catch (error) {
+      console.error('[Tetris] session validation failed', error);
+      setSessionId(null);
+      setSessionStatus('locked');
+      return { valid: false, session_id: null, player_id: null, reason: null };
+    }
+  }, []);
+
   const handleWalletConnect = useCallback(async (address: string) => {
     setWalletAddress(address);
+    const [, validationResult] = await Promise.all([syncBalances(address), validateSession(address)]);
+    // Also grab player ID from DB
     const { data } = await supabase.from('players').select('id').eq('wallet_address', address.toLowerCase()).single();
     if (data) setPlayerId(data.id);
-  }, []);
+  }, [syncBalances, validateSession]);
 
   const handleWalletDisconnect = useCallback(() => {
     setWalletAddress(null); setPlayerId(null); setSessionId(null);
-    setBalanceETH('0'); setBalanceUSDC('0'); setHasPaidForSession(false);
+    setBalanceETH('0'); setBalanceUSDC('0'); setSessionStatus('locked');
   }, []);
+
+  // Refresh balances when payment modal opens
+  useEffect(() => {
+    if (!showPayment || !walletAddress) return;
+    syncBalances(walletAddress).catch(console.error);
+  }, [showPayment, walletAddress, syncBalances]);
 
   const startNewGame = useCallback(async (token: PaymentToken) => {
     if (!walletAddress) { toast.error('Connect wallet first'); return; }
@@ -86,9 +129,26 @@ const PlayTetris = () => {
       const feeAmount = isCreatorPayment ? CREATOR_FEE_ETH : token === 'ETH' ? dynamicEthFee ?? '0.00040000' : GAME_FEE_USDC;
       const paymentToken = isCreatorPayment ? 'ETH' : token;
 
+      // Pre-play balance check
+      const balances = await syncBalances(walletAddress);
+      const sufficient = hasSufficientBalance(paymentToken, feeAmount, balances);
+      console.info('[Tetris] pre-play balance check', { walletAddress, token: paymentToken, balance: paymentToken === 'ETH' ? balances.ethBalance : balances.usdcBalance, requiredFee: feeAmount, sufficient });
+
+      if (!sufficient) {
+        toast.error('Insufficient balance to start a new session');
+        return;
+      }
+
+      toast.info(isCreatorPayment
+        ? `Creator verification: Sending ${feeAmount} ETH...`
+        : `Sending ${feeAmount} ${paymentToken}... Please confirm in your wallet.`
+      );
+
       let txHash: string;
       if (paymentToken === 'ETH') txHash = await sendETHPayment(walletAddress as Address, feeAmount);
       else txHash = await sendUSDCPayment(walletAddress as Address, feeAmount);
+
+      toast.info('Payment confirmed! Creating game session...');
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/create-game-session`, {
         method: 'POST',
@@ -99,20 +159,26 @@ const PlayTetris = () => {
       if (!response.ok) throw new Error(result.error);
 
       setSessionId(result.session_id); setPlayerId(result.player_id);
-      setHasPaidForSession(true); setScoreSaved(false); resetGame(); setShowPayment(false);
+      setSessionStatus('active'); setScoreSaved(false); resetGame(); setShowPayment(false);
+      console.info('[Tetris] session unlocked after payment', { walletAddress, txHash, sessionId: result.session_id });
       toast.success('Game started!');
     } catch (error: any) {
-      toast.error(error.message || 'Payment failed');
+      const msg = String(error?.message || '').toLowerCase();
+      if (msg.includes('rejected') || msg.includes('denied') || msg.includes('not authorized')) {
+        toast.error('Transaction cancelled');
+      } else {
+        toast.error(error.message || 'Payment failed');
+      }
     } finally { setIsProcessing(false); }
-  }, [walletAddress, isCreator, dynamicEthFee, resetGame]);
+  }, [walletAddress, isCreator, dynamicEthFee, resetGame, syncBalances]);
 
   const handlePlayAgain = useCallback(() => {
     setScoreSaved(false);
-    setHasPaidForSession(false);
+    setSessionStatus('locked');
     setSessionId(null);
-    if (walletAddress && playerId) setShowPayment(true);
+    if (walletAddress) setShowPayment(true);
     else resetGame();
-  }, [walletAddress, playerId, resetGame]);
+  }, [walletAddress, resetGame]);
 
   const endSession = useCallback(async (saveScore: boolean) => {
     if (sessionId && walletAddress && score >= 0) {
@@ -124,7 +190,7 @@ const PlayTetris = () => {
         });
       } catch (e) { console.error(e); }
     }
-    setHasPaidForSession(false);
+    setSessionStatus('locked');
     setSessionId(null);
   }, [sessionId, walletAddress, score]);
 
@@ -138,7 +204,7 @@ const PlayTetris = () => {
       });
       if (res.ok) {
         setScoreSaved(true);
-        setHasPaidForSession(false);
+        setSessionStatus('locked');
         toast.success('Score saved to leaderboard!');
         return true;
       }
@@ -155,21 +221,22 @@ const PlayTetris = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true }),
       }).catch(console.error);
+      setSessionStatus('locked');
     }
   }, [gameOver, sessionId, walletAddress, score]);
 
-  // Handle back button click - show exit modal if game active
+  // Handle back button click
   const handleBackClick = useCallback((e: React.MouseEvent) => {
     if (isGameActive) {
       e.preventDefault();
-      togglePause(); // pause game
+      togglePause();
       setShowExitModal(true);
     }
   }, [isGameActive, togglePause]);
 
   const handleExitCancel = useCallback(() => {
     setShowExitModal(false);
-    if (isPaused) togglePause(); // resume
+    if (isPaused) togglePause();
   }, [isPaused, togglePause]);
 
   const handleSaveAndExit = useCallback(async () => {
@@ -185,20 +252,18 @@ const PlayTetris = () => {
     navigate('/');
   }, [endSession, navigate]);
 
-  // Browser back button / beforeunload
+  // Browser beforeunload
   useEffect(() => {
     if (!isGameActive) return;
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isGameActive]);
 
   const needsWalletConnection = !walletAddress;
-  const needsPayment = walletAddress && !hasPaidForSession;
-  const isPlayBlocked = needsWalletConnection || !!needsPayment;
-  const showControls = walletAddress && hasPaidForSession && !gameOver;
+  const needsPayment = walletAddress && sessionStatus === 'locked';
+  const isPlayBlocked = needsWalletConnection || isCheckingSession || !!needsPayment;
+  const showControls = walletAddress && hasActiveSession && !gameOver;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-500/20 via-background to-secondary/30">
@@ -231,7 +296,7 @@ const PlayTetris = () => {
                 {isPaused ? 'Resume' : 'Pause'}
               </Button>
             )}
-            {walletAddress && hasPaidForSession && (
+            {walletAddress && hasActiveSession && (
               <Button variant="outline" size="sm" onClick={() => setShowPayment(true)} className="gradient-primary text-primary-foreground border-none">
                 <RotateCcw className="mr-1 h-4 w-4" /> New Game
               </Button>
@@ -242,14 +307,20 @@ const PlayTetris = () => {
             {isPlayBlocked && (
               <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center rounded-xl">
                 <Lock className="h-12 w-12 text-primary mb-4" />
-                {needsWalletConnection ? (
+                {isCheckingSession ? (
+                  <>
+                    <p className="text-lg font-semibold mb-2">Checking Session</p>
+                    <p className="text-sm text-muted-foreground">Validating your latest paid session...</p>
+                  </>
+                ) : needsWalletConnection ? (
                   <>
                     <p className="text-lg font-semibold mb-2">Connect Wallet to Play</p>
                     <WalletConnect onConnect={handleWalletConnect} onDisconnect={handleWalletDisconnect} onBalanceUpdate={handleBalanceUpdate} />
                   </>
                 ) : (
                   <>
-                    <p className="text-lg font-semibold mb-2">Pay to Play</p>
+                    <p className="text-lg font-semibold mb-2">New Session Required</p>
+                    <p className="text-sm text-muted-foreground mb-4">You need to start a new session to play</p>
                     <Button onClick={() => setShowPayment(true)} className="gradient-gold text-accent-foreground">Pay $0.99</Button>
                   </>
                 )}
