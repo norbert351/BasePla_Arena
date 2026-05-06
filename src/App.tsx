@@ -11,6 +11,7 @@ import { wagmiConfig } from "./lib/wagmi";
 const Home = lazy(() => import("./pages/Home"));
 const Play2048 = lazy(() => import("./pages/Play2048"));
 const PlayTetris = lazy(() => import("./pages/PlayTetris"));
+const PlayTyping = lazy(() => import("./pages/PlayTyping"));
 const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -39,6 +40,7 @@ const App = () => (
               <Route path="/" element={<Home />} />
               <Route path="/play/2048" element={<Play2048 />} />
               <Route path="/play/tetris" element={<PlayTetris />} />
+              <Route path="/play/typing" element={<PlayTyping />} />
               <Route path="/leaderboard/:gameType" element={<LeaderboardPage />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/admin" element={<Admin />} />
