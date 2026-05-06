@@ -40,21 +40,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get the session and verify ownership
+    // Get the session
     const { data: session, error: sessionError } = await supabase
       .from("game_sessions")
-      .select(`id, player_id, is_active, score, game_type, players!inner (wallet_address)`)
+      .select("id, player_id, is_active, score, game_type")
       .eq("id", session_id)
       .single();
 
     if (sessionError || !session) {
+      console.error("Session lookup error:", sessionError);
       return new Response(
         JSON.stringify({ error: "Session not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const sessionWallet = (session.players as any).wallet_address?.toLowerCase();
+    // Verify wallet ownership via players table
+    const { data: player } = await supabase
+      .from("players")
+      .select("wallet_address")
+      .eq("id", session.player_id)
+      .single();
+
+    const sessionWallet = player?.wallet_address?.toLowerCase();
     if (sessionWallet !== wallet_address.toLowerCase()) {
       return new Response(
         JSON.stringify({ error: "Unauthorized - wallet does not match session owner" }),

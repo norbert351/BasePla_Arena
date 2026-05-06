@@ -53,6 +53,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_game_sessions_player"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "game_sessions_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
