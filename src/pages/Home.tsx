@@ -10,6 +10,7 @@ import baseplayLogo from '@/assets/baseplay-logo.png';
 const preloadGames = () => {
   import('../pages/Play2048');
   import('../pages/PlayTetris');
+  import('../pages/PlayTyping');
 };
 
 
@@ -34,6 +35,14 @@ const games = [
     emoji: '🧱',
     path: '/play/tetris',
     gradient: 'from-purple-500 to-pink-500',
+  },
+  {
+    id: 'typing',
+    title: 'Speed Typing',
+    description: 'Type fast, climb the ranks, prove your speed!',
+    emoji: '⌨️',
+    path: '/play/typing',
+    gradient: 'from-green-500 to-teal-500',
   },
 ];
 
@@ -117,7 +126,7 @@ const Home = () => {
             Play. Compete. Win.
           </h2>
           <p className="text-lg text-muted-foreground max-w-lg mx-auto mb-8">
-            Play 2048 and Tetris, Rank up on Leaderboard, and earn from a community driven reward pool.
+            Play 2048, Tetris & Speed Typing, Rank up on Leaderboard, and earn from a community driven reward pool.
           </p>
         </div>
       </section>
@@ -157,6 +166,11 @@ const Home = () => {
           <Link to="/leaderboard/tetris">
             <Button variant="outline" className="gap-2">
               <Trophy className="h-4 w-4" /> Tetris Leaderboard
+            </Button>
+          </Link>
+          <Link to="/leaderboard/typing">
+            <Button variant="outline" className="gap-2">
+              <Trophy className="h-4 w-4" /> Typing Leaderboard
             </Button>
           </Link>
         </div>

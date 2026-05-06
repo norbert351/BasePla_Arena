@@ -3,7 +3,7 @@ import { getETHBalance, getUSDCBalance } from '@/lib/blockchain';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
-export type GameType = '2048' | 'tetris';
+export type GameType = '2048' | 'tetris' | 'typing';
 export type SessionPaymentToken = 'ETH' | 'USDC';
 
 export interface WalletBalanceSnapshot {

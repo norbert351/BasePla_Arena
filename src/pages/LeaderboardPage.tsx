@@ -54,7 +54,7 @@ const LeaderboardPage = () => {
     },
   });
 
-  const title = gameType === 'tetris' ? 'Tetris' : '2048';
+  const title = gameType === 'tetris' ? 'Tetris' : gameType === 'typing' ? 'Speed Typing' : '2048';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30 px-4 py-6">
