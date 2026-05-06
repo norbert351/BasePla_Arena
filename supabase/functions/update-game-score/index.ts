@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     }
 
     // Different max score increase for different games
-    const maxScoreIncrease = session.game_type === 'tetris' ? 50000 : 8192;
+    const maxScoreIncrease = session.game_type === 'tetris' ? 50000 : session.game_type === 'typing' ? 10000 : 8192;
     if (parsedScore - session.score > maxScoreIncrease) {
       console.warn(`Suspicious score increase: ${session.score} -> ${parsedScore} for session ${session_id}`);
       return new Response(
