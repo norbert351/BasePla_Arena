@@ -147,7 +147,7 @@ const Home = () => {
                 <p className="text-muted-foreground mb-4">{game.description}</p>
                 <div className="flex items-center gap-2 text-sm text-primary font-semibold">
                   <Gamepad2 className="h-4 w-4" />
-                  Play Now — $0.99/session
+                  Play Now — $0.49/session
                 </div>
               </div>
             </Link>

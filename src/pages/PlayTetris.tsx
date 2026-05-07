@@ -17,7 +17,7 @@ import type { Address } from 'viem';
 import baseplayLogo from '@/assets/baseplay-logo.png';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const GAME_FEE_USDC = '0.99';
+const GAME_FEE_USDC = '0.49';
 const CREATOR_FEE_ETH = '0.0001';
 
 const CREATOR_WALLETS = [
@@ -321,7 +321,7 @@ const PlayTetris = () => {
                   <>
                     <p className="text-lg font-semibold mb-2">New Session Required</p>
                     <p className="text-sm text-muted-foreground mb-4">You need to start a new session to play</p>
-                    <Button onClick={() => setShowPayment(true)} className="gradient-gold text-accent-foreground">Pay $0.99</Button>
+                    <Button onClick={() => setShowPayment(true)} className="gradient-gold text-accent-foreground">Pay $0.49</Button>
                   </>
                 )}
               </div>

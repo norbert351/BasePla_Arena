@@ -70,52 +70,57 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!session.is_active) {
+    if (!session.is_active && !save_to_leaderboard) {
       return new Response(
         JSON.stringify({ error: "Session is no longer active" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (parsedScore < session.score) {
-      return new Response(
-        JSON.stringify({ error: "Score cannot decrease" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // If session is already ended, only allow leaderboard save with existing score
+    const effectiveScore = !session.is_active ? session.score : parsedScore;
 
-    // Different max score increase for different games
-    const maxScoreIncrease = session.game_type === 'tetris' ? 50000 : session.game_type === 'typing' ? 10000 : 8192;
-    if (parsedScore - session.score > maxScoreIncrease) {
-      console.warn(`Suspicious score increase: ${session.score} -> ${parsedScore} for session ${session_id}`);
-      return new Response(
-        JSON.stringify({ error: "Invalid score increase" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    if (session.is_active) {
+      if (parsedScore < session.score) {
+        return new Response(
+          JSON.stringify({ error: "Score cannot decrease" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    // Update session
-    const updateData: any = { score: parsedScore };
-    if (end_game) {
-      updateData.is_active = false;
-      updateData.ended_at = new Date().toISOString();
-    }
+      // Different max score increase for different games
+      const maxScoreIncrease = session.game_type === 'tetris' ? 50000 : session.game_type === 'typing' ? 10000 : 8192;
+      if (parsedScore - session.score > maxScoreIncrease) {
+        console.warn(`Suspicious score increase: ${session.score} -> ${parsedScore} for session ${session_id}`);
+        return new Response(
+          JSON.stringify({ error: "Invalid score increase" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    const { error: updateError } = await supabase
-      .from("game_sessions")
-      .update(updateData)
-      .eq("id", session_id);
+      // Update session
+      const updateData: any = { score: parsedScore };
+      if (end_game) {
+        updateData.is_active = false;
+        updateData.ended_at = new Date().toISOString();
+      }
 
-    if (updateError) {
-      console.error("Update error:", updateError);
-      return new Response(
-        JSON.stringify({ error: "Failed to update score" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const { error: updateError } = await supabase
+        .from("game_sessions")
+        .update(updateData)
+        .eq("id", session_id);
+
+      if (updateError) {
+        console.error("Update error:", updateError);
+        return new Response(
+          JSON.stringify({ error: "Failed to update score" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Save to leaderboard — compare against ALL-TIME high score (no week filter)
-    if (save_to_leaderboard && end_game) {
+    if (save_to_leaderboard) {
       const now = new Date();
       const dayOfWeek = now.getUTCDay();
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -138,7 +143,7 @@ Deno.serve(async (req) => {
         .single();
 
       // Only save if this score is higher than all-time best (or no entry exists)
-      if (!allTimeBest || parsedScore > allTimeBest.high_score) {
+      if (!allTimeBest || effectiveScore > allTimeBest.high_score) {
         // Check if there's an entry for this week
         const { data: weekEntry } = await supabase
           .from("leaderboard")
@@ -150,14 +155,14 @@ Deno.serve(async (req) => {
         if (weekEntry) {
           await supabase
             .from("leaderboard")
-            .update({ high_score: parsedScore, updated_at: now.toISOString() })
+            .update({ high_score: effectiveScore, updated_at: now.toISOString() })
             .eq("id", weekEntry.id);
         } else {
           await supabase
             .from("leaderboard")
             .insert({
               player_id: session.player_id,
-              high_score: parsedScore,
+              high_score: effectiveScore,
               week_start: weekStartStr,
               week_end: weekEndStr,
             });
