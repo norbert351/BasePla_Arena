@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!session.is_active) {
+    if (!session.is_active && !save_to_leaderboard) {
       return new Response(
         JSON.stringify({ error: "Session is no longer active" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
