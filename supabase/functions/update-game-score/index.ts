@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
             .from("leaderboard")
             .insert({
               player_id: session.player_id,
-              high_score: parsedScore,
+              high_score: effectiveScore,
               week_start: weekStartStr,
               week_end: weekEndStr,
             });
