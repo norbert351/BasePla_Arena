@@ -77,41 +77,46 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (parsedScore < session.score) {
-      return new Response(
-        JSON.stringify({ error: "Score cannot decrease" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // If session is already ended, only allow leaderboard save with existing score
+    const effectiveScore = !session.is_active ? session.score : parsedScore;
 
-    // Different max score increase for different games
-    const maxScoreIncrease = session.game_type === 'tetris' ? 50000 : session.game_type === 'typing' ? 10000 : 8192;
-    if (parsedScore - session.score > maxScoreIncrease) {
-      console.warn(`Suspicious score increase: ${session.score} -> ${parsedScore} for session ${session_id}`);
-      return new Response(
-        JSON.stringify({ error: "Invalid score increase" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    if (session.is_active) {
+      if (parsedScore < session.score) {
+        return new Response(
+          JSON.stringify({ error: "Score cannot decrease" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    // Update session
-    const updateData: any = { score: parsedScore };
-    if (end_game) {
-      updateData.is_active = false;
-      updateData.ended_at = new Date().toISOString();
-    }
+      // Different max score increase for different games
+      const maxScoreIncrease = session.game_type === 'tetris' ? 50000 : session.game_type === 'typing' ? 10000 : 8192;
+      if (parsedScore - session.score > maxScoreIncrease) {
+        console.warn(`Suspicious score increase: ${session.score} -> ${parsedScore} for session ${session_id}`);
+        return new Response(
+          JSON.stringify({ error: "Invalid score increase" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    const { error: updateError } = await supabase
-      .from("game_sessions")
-      .update(updateData)
-      .eq("id", session_id);
+      // Update session
+      const updateData: any = { score: parsedScore };
+      if (end_game) {
+        updateData.is_active = false;
+        updateData.ended_at = new Date().toISOString();
+      }
 
-    if (updateError) {
-      console.error("Update error:", updateError);
-      return new Response(
-        JSON.stringify({ error: "Failed to update score" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const { error: updateError } = await supabase
+        .from("game_sessions")
+        .update(updateData)
+        .eq("id", session_id);
+
+      if (updateError) {
+        console.error("Update error:", updateError);
+        return new Response(
+          JSON.stringify({ error: "Failed to update score" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Save to leaderboard — compare against ALL-TIME high score (no week filter)
