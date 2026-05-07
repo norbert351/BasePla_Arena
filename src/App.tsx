@@ -53,6 +53,7 @@ const App = () => (
       </TooltipProvider>
     </QueryClientProvider>
   </WagmiProvider>
+  </ErrorBoundary>
 );
 
 export default App;
