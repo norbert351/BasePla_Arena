@@ -30,6 +30,7 @@ const PageLoader = () => (
 );
 
 const App = () => (
+  <ErrorBoundary>
   <WagmiProvider config={wagmiConfig}>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
