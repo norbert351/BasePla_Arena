@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
     }
 
     // Save to leaderboard — compare against ALL-TIME high score (no week filter)
-    if (save_to_leaderboard && end_game) {
+    if (save_to_leaderboard) {
       const now = new Date();
       const dayOfWeek = now.getUTCDay();
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
         .single();
 
       // Only save if this score is higher than all-time best (or no entry exists)
-      if (!allTimeBest || parsedScore > allTimeBest.high_score) {
+      if (!allTimeBest || effectiveScore > allTimeBest.high_score) {
         // Check if there's an entry for this week
         const { data: weekEntry } = await supabase
           .from("leaderboard")
@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
         if (weekEntry) {
           await supabase
             .from("leaderboard")
-            .update({ high_score: parsedScore, updated_at: now.toISOString() })
+            .update({ high_score: effectiveScore, updated_at: now.toISOString() })
             .eq("id", weekEntry.id);
         } else {
           await supabase
