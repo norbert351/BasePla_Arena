@@ -15,7 +15,7 @@ import type { Address } from 'viem';
 import baseplayLogo from '@/assets/baseplay-logo.png';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const GAME_FEE_USDC = '0.99';
+const GAME_FEE_USDC = '0.49';
 const CREATOR_FEE_ETH = '0.0001';
 
 const CREATOR_WALLETS = [
