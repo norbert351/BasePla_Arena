@@ -138,6 +138,7 @@ Deno.serve(async (req) => {
         .from("leaderboard")
         .select("id, high_score")
         .eq("player_id", session.player_id)
+        .eq("game_type", session.game_type)
         .order("high_score", { ascending: false })
         .limit(1)
         .single();
@@ -150,22 +151,40 @@ Deno.serve(async (req) => {
           .select("id")
           .eq("player_id", session.player_id)
           .eq("week_start", weekStartStr)
+          .eq("game_type", session.game_type)
           .single();
 
         if (weekEntry) {
-          await supabase
+          const { error: leaderboardUpdateError } = await supabase
             .from("leaderboard")
             .update({ high_score: effectiveScore, updated_at: now.toISOString() })
             .eq("id", weekEntry.id);
+
+          if (leaderboardUpdateError) {
+            console.error("Leaderboard update error:", leaderboardUpdateError);
+            return new Response(
+              JSON.stringify({ error: "Failed to update leaderboard" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
         } else {
-          await supabase
+          const { error: leaderboardInsertError } = await supabase
             .from("leaderboard")
             .insert({
               player_id: session.player_id,
               high_score: effectiveScore,
               week_start: weekStartStr,
               week_end: weekEndStr,
+              game_type: session.game_type,
             });
+
+          if (leaderboardInsertError) {
+            console.error("Leaderboard insert error:", leaderboardInsertError);
+            return new Response(
+              JSON.stringify({ error: "Failed to save leaderboard score" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
         }
       }
     }

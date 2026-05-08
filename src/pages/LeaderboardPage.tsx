@@ -19,26 +19,24 @@ const LeaderboardPage = () => {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['leaderboard', gameType],
     queryFn: async () => {
-      // We need to filter by game_type but types may not reflect new column yet
-      // Use raw query approach
       const { data, error } = await (supabase
-        .from('game_sessions')
-        .select(`score, player_id, players!inner(wallet_address, display_name, username, fid, pfp_url)`) as any)
+        .from('leaderboard')
+        .select(`high_score, player_id, players!inner(wallet_address, display_name, username, fid, pfp_url)`) as any)
         .eq('game_type', gameType)
-        .order('score', { ascending: false })
+        .order('high_score', { ascending: false })
         .limit(100);
 
       if (error) throw error;
 
       const playerScores = new Map<string, { wallet: string; displayName: string; score: number; fid: number | null; pfpUrl: string | null }>();
-      data?.forEach((session: any) => {
-        const wallet = session.players.wallet_address;
-        const displayName = session.players.username || session.players.display_name || shortenWallet(wallet);
+      data?.forEach((entry: any) => {
+        const wallet = entry.players.wallet_address;
+        const displayName = entry.players.username || entry.players.display_name || shortenWallet(wallet);
         const existing = playerScores.get(wallet);
-        if (!existing || session.score > existing.score) {
+        if (!existing || entry.high_score > existing.score) {
           playerScores.set(wallet, {
-            wallet, displayName, score: session.score,
-            fid: session.players.fid || null, pfpUrl: session.players.pfp_url || null,
+            wallet, displayName, score: entry.high_score,
+            fid: entry.players.fid || null, pfpUrl: entry.players.pfp_url || null,
           });
         }
       });
