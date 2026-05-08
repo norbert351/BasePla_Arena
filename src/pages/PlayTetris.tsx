@@ -180,37 +180,21 @@ const PlayTetris = () => {
     else resetGame();
   }, [walletAddress, resetGame]);
 
-  const endSession = useCallback(async (saveScore: boolean) => {
+  const endSession = useCallback(async () => {
     if (sessionId && walletAddress && score >= 0) {
       try {
-        await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true, save_to_leaderboard: saveScore }),
+          body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true }),
         });
+        if (res.ok) {
+          setScoreSaved(true);
+        }
       } catch (e) { console.error(e); }
     }
     setSessionStatus('locked');
     setSessionId(null);
-  }, [sessionId, walletAddress, score]);
-
-  const handleSaveScore = useCallback(async (): Promise<boolean> => {
-    if (!sessionId || !walletAddress) return false;
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true, save_to_leaderboard: true }),
-      });
-      if (res.ok) {
-        setScoreSaved(true);
-        setSessionStatus('locked');
-        toast.success('Score saved to leaderboard!');
-        return true;
-      }
-    } catch (e) { console.error(e); }
-    toast.error('Failed to save score');
-    return false;
   }, [sessionId, walletAddress, score]);
 
   // Auto end session on game over
@@ -220,6 +204,13 @@ const PlayTetris = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true }),
+      }).then((res) => {
+        if (res.ok) {
+          setScoreSaved(true);
+          toast.success('Score saved to leaderboard!');
+        } else {
+          toast.error('Failed to save score');
+        }
       }).catch(console.error);
       setSessionStatus('locked');
     }
@@ -239,16 +230,10 @@ const PlayTetris = () => {
     if (isPaused) togglePause();
   }, [isPaused, togglePause]);
 
-  const handleSaveAndExit = useCallback(async () => {
-    await endSession(true);
+  const handleExit = useCallback(async () => {
+    await endSession();
     setShowExitModal(false);
     toast.success('Score saved!');
-    navigate('/');
-  }, [endSession, navigate]);
-
-  const handleExitWithoutSaving = useCallback(async () => {
-    await endSession(false);
-    setShowExitModal(false);
     navigate('/');
   }, [endSession, navigate]);
 
@@ -354,7 +339,7 @@ const PlayTetris = () => {
         </div>
       </main>
 
-      <GameOverModal isOpen={gameOver} score={score} won={false} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} onSaveScore={sessionId ? handleSaveScore : undefined} scoreSaved={scoreSaved} />
+      <GameOverModal isOpen={gameOver} score={score} won={false} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} scoreSaved={scoreSaved} />
       <PaymentModal isOpen={showPayment} onClose={() => setShowPayment(false)} onPay={startNewGame}
         feeETH={isCreator ? CREATOR_FEE_ETH : dynamicEthFee ?? '0.00040000'} feeUSDC={GAME_FEE_USDC}
         balanceETH={balanceETH} balanceUSDC={balanceUSDC} isLoading={isProcessing}
@@ -364,8 +349,7 @@ const PlayTetris = () => {
         isOpen={showExitModal}
         score={score}
         onCancel={handleExitCancel}
-        onSaveAndExit={handleSaveAndExit}
-        onExitWithoutSaving={handleExitWithoutSaving}
+        onExit={handleExit}
       />
     </div>
   );
