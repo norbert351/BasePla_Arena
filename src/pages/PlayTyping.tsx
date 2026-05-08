@@ -6,7 +6,7 @@ import { PaymentModal, PaymentToken } from '@/components/game/PaymentModal';
 import { Button } from '@/components/ui/button';
 import { sendETHPayment, sendUSDCPayment } from '@/lib/blockchain';
 import { hasSufficientBalance, refreshWalletBalances, validateActiveGameSession } from '@/lib/session-access';
-import { ArrowLeft, Trophy, Lock, Keyboard, Zap, Target, Flame } from 'lucide-react';
+import { ArrowLeft, Trophy, Lock, Keyboard, Zap, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Address } from 'viem';
@@ -158,28 +158,19 @@ const PlayTyping = () => {
     if (walletAddress) setShowPayment(true);
   }, [walletAddress, resetGame]);
 
-  const handleSaveScore = useCallback(async (): Promise<boolean> => {
-    if (!sessionId || !walletAddress || finalScore <= 0) return false;
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId, wallet_address: walletAddress,
-          score: finalScore, end_game: true, save_to_leaderboard: true,
-        }),
-      });
-      if (res.ok) { setScoreSaved(true); toast.success('Score saved to leaderboard!'); return true; }
-    } catch (e) { console.error(e); }
-    toast.error('Failed to save score');
-    return false;
-  }, [sessionId, walletAddress, finalScore]);
-
   // End game session when game finishes
   useEffect(() => {
     if (phase === 'finished' && sessionId && walletAddress) {
       fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score: finalScore, end_game: true }),
+      }).then((res) => {
+        if (res.ok) {
+          setScoreSaved(true);
+          toast.success('Score saved to leaderboard!');
+        } else {
+          toast.error('Failed to save score');
+        }
       }).catch(console.error);
       setSessionStatus('locked');
     }
@@ -408,17 +399,7 @@ const PlayTyping = () => {
                 </div>
 
                 <div className="flex flex-col gap-2 items-center">
-                  {sessionId && (
-                    <Button
-                      onClick={handleSaveScore}
-                      disabled={scoreSaved || finalScore <= 0}
-                      variant="outline"
-                      className={scoreSaved ? 'text-green-500 border-green-500' : ''}
-                    >
-                      <Target className="mr-2 h-4 w-4" />
-                      {scoreSaved ? 'Score Saved ✓' : 'Save to Leaderboard'}
-                    </Button>
-                  )}
+                  {scoreSaved && <p className="text-sm font-medium text-green-500">Score saved to leaderboard.</p>}
                   <Button onClick={handlePlayAgain} className="gradient-primary text-primary-foreground glow-primary hover:opacity-90">
                     Play Again
                   </Button>
