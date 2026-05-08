@@ -6,8 +6,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Trophy, RotateCcw, Save } from 'lucide-react';
-import { useState } from 'react';
+import { Trophy, RotateCcw } from 'lucide-react';
 
 interface GameOverModalProps {
   isOpen: boolean;
@@ -15,26 +14,13 @@ interface GameOverModalProps {
   won: boolean;
   onPlayAgain: () => void;
   onClose?: () => void;
-  onSaveScore?: () => Promise<boolean>;
   scoreSaved?: boolean;
 }
 
-export const GameOverModal = ({ isOpen, score, won, onPlayAgain, onClose, onSaveScore, scoreSaved }: GameOverModalProps) => {
-  const [saving, setSaving] = useState(false);
-
+export const GameOverModal = ({ isOpen, score, won, onPlayAgain, onClose, scoreSaved }: GameOverModalProps) => {
   const handleOpenChange = (open: boolean) => {
     if (!open && onClose) {
       onClose();
-    }
-  };
-
-  const handleSave = async () => {
-    if (!onSaveScore) return;
-    setSaving(true);
-    try {
-      await onSaveScore();
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -56,17 +42,7 @@ export const GameOverModal = ({ isOpen, score, won, onPlayAgain, onClose, onSave
             <p className="text-4xl font-bold gradient-title">{score.toLocaleString()}</p>
           </div>
 
-          {onSaveScore && (
-            <Button
-              onClick={handleSave}
-              disabled={saving || scoreSaved}
-              variant="outline"
-              className={scoreSaved ? 'text-green-500 border-green-500' : ''}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {scoreSaved ? 'Score Saved to Leaderboard ✓' : saving ? 'Saving...' : 'Save Score to Leaderboard'}
-            </Button>
-          )}
+          {scoreSaved && <p className="text-sm font-medium text-green-500">Score saved to leaderboard.</p>}
 
           <Button
             onClick={(e) => {
