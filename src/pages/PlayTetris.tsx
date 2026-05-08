@@ -230,16 +230,10 @@ const PlayTetris = () => {
     if (isPaused) togglePause();
   }, [isPaused, togglePause]);
 
-  const handleSaveAndExit = useCallback(async () => {
+  const handleExit = useCallback(async () => {
     await endSession();
     setShowExitModal(false);
     toast.success('Score saved!');
-    navigate('/');
-  }, [endSession, navigate]);
-
-  const handleExitWithoutSaving = useCallback(async () => {
-    await endSession();
-    setShowExitModal(false);
     navigate('/');
   }, [endSession, navigate]);
 
@@ -355,8 +349,7 @@ const PlayTetris = () => {
         isOpen={showExitModal}
         score={score}
         onCancel={handleExitCancel}
-        onSaveAndExit={handleSaveAndExit}
-        onExitWithoutSaving={handleExitWithoutSaving}
+        onExit={handleExit}
       />
     </div>
   );
