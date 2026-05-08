@@ -26,13 +26,14 @@ export const Leaderboard = () => {
     queryKey: ['leaderboard'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('game_sessions')
+        .from('leaderboard')
         .select(`
-          score,
+          high_score,
           player_id,
           players!inner(wallet_address, display_name, fid, pfp_url)
         `)
-        .order('score', { ascending: false })
+        .eq('game_type', '2048')
+        .order('high_score', { ascending: false })
         .limit(100);
 
       if (error) throw error;
@@ -45,17 +46,17 @@ export const Leaderboard = () => {
         pfpUrl: string | null;
       }>();
       
-      data?.forEach((session: any) => {
-        const wallet = session.players.wallet_address;
-        const displayName = session.players.display_name;
-        const fid = session.players.fid;
-        const pfpUrl = session.players.pfp_url;
+      data?.forEach((entry: any) => {
+        const wallet = entry.players.wallet_address;
+        const displayName = entry.players.display_name;
+        const fid = entry.players.fid;
+        const pfpUrl = entry.players.pfp_url;
         const existing = playerScores.get(wallet);
-        if (!existing || session.score > existing.score) {
+        if (!existing || entry.high_score > existing.score) {
           playerScores.set(wallet, { 
             wallet, 
             displayName: displayName || shortenWallet(wallet),
-            score: session.score,
+            score: entry.high_score,
             fid: fid || null,
             pfpUrl: pfpUrl || null,
           });
