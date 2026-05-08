@@ -70,7 +70,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!session.is_active && !save_to_leaderboard) {
+    const shouldSaveToLeaderboard = Boolean(save_to_leaderboard || end_game);
+
+    if (!session.is_active && !shouldSaveToLeaderboard) {
       return new Response(
         JSON.stringify({ error: "Session is no longer active" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -120,7 +122,7 @@ Deno.serve(async (req) => {
     }
 
     // Save to leaderboard — compare against ALL-TIME high score (no week filter)
-    if (save_to_leaderboard) {
+    if (shouldSaveToLeaderboard) {
       const now = new Date();
       const dayOfWeek = now.getUTCDay();
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -190,7 +192,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, score: parsedScore }),
+      JSON.stringify({ success: true, score: effectiveScore, saved_to_leaderboard: shouldSaveToLeaderboard }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
