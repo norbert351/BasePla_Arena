@@ -71,6 +71,7 @@ export type Database = {
       leaderboard: {
         Row: {
           created_at: string
+          game_type: string
           high_score: number
           id: string
           player_id: string
@@ -81,6 +82,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          game_type: string
           high_score?: number
           id?: string
           player_id: string
@@ -91,6 +93,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          game_type?: string
           high_score?: number
           id?: string
           player_id?: string
