@@ -21,6 +21,7 @@ export type Database = {
           game_type: string
           id: string
           is_active: boolean
+          leaderboard_submitted: boolean
           player_id: string
           score: number
           started_at: string
@@ -33,6 +34,7 @@ export type Database = {
           game_type?: string
           id?: string
           is_active?: boolean
+          leaderboard_submitted?: boolean
           player_id: string
           score?: number
           started_at?: string
@@ -45,6 +47,7 @@ export type Database = {
           game_type?: string
           id?: string
           is_active?: boolean
+          leaderboard_submitted?: boolean
           player_id?: string
           score?: number
           started_at?: string
@@ -225,7 +228,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_leaderboard_score: {
+        Args: {
+          p_game_type: string
+          p_player_id: string
+          p_score: number
+          p_week_end: string
+          p_week_start: string
+        }
+        Returns: {
+          new_total: number
+          previous_score: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
