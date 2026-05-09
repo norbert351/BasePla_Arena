@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTetris } from '@/hooks/useTetris';
 import { TetrisBoard } from '@/components/game/TetrisBoard';
 import { ScoreBox } from '@/components/game/ScoreBox';
@@ -33,6 +34,8 @@ type SessionStatus = 'checking' | 'locked' | 'active';
 const PlayTetris = () => {
   const { board, score, level, lines, gameOver, isPaused, softDropping, moveDown, moveHorizontal, rotatePiece, hardDrop, resetGame, togglePause, setSoftDropping, setFrozen } = useTetris();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const submittedRef = useRef(false);
 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -174,47 +177,50 @@ const PlayTetris = () => {
 
   const handlePlayAgain = useCallback(() => {
     setScoreSaved(false);
+    submittedRef.current = false;
     setSessionStatus('locked');
     setSessionId(null);
     if (walletAddress) setShowPayment(true);
     else resetGame();
   }, [walletAddress, resetGame]);
 
-  const endSession = useCallback(async () => {
-    if (sessionId && walletAddress && score >= 0) {
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true }),
-        });
-        if (res.ok) {
-          setScoreSaved(true);
-        }
-      } catch (e) { console.error(e); }
-    }
-    setSessionStatus('locked');
-    setSessionId(null);
-  }, [sessionId, walletAddress, score]);
-
-  // Auto end session on game over
-  useEffect(() => {
-    if (gameOver && sessionId && walletAddress) {
-      fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
+  const submitFinalScore = useCallback(async () => {
+    if (!sessionId || !walletAddress || submittedRef.current) return;
+    submittedRef.current = true;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true }),
-      }).then((res) => {
-        if (res.ok) {
-          setScoreSaved(true);
-          toast.success('Score saved to leaderboard!');
-        } else {
-          toast.error('Failed to save score');
-        }
-      }).catch(console.error);
-      setSessionStatus('locked');
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setScoreSaved(true);
+        toast.success('Score saved to leaderboard');
+        queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      } else {
+        submittedRef.current = false;
+        toast.error(data?.error || 'Failed to save score');
+      }
+    } catch (e) {
+      submittedRef.current = false;
+      console.error(e);
+      toast.error('Failed to save score');
     }
-  }, [gameOver, sessionId, walletAddress, score]);
+  }, [sessionId, walletAddress, score, queryClient]);
+
+  const endSession = useCallback(async () => {
+    await submitFinalScore();
+    setSessionStatus('locked');
+    setSessionId(null);
+  }, [submitFinalScore]);
+
+  // Auto end session on game over
+  useEffect(() => {
+    if (gameOver && sessionId && walletAddress && !submittedRef.current) {
+      submitFinalScore().then(() => setSessionStatus('locked'));
+    }
+  }, [gameOver, sessionId, walletAddress, submitFinalScore]);
 
   // Handle back button click
   const handleBackClick = useCallback((e: React.MouseEvent) => {
