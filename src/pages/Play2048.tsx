@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { use2048 } from '@/hooks/use2048';
 import { GameBoard } from '@/components/game/GameBoard';
 import { ScoreBox } from '@/components/game/ScoreBox';
@@ -30,6 +31,8 @@ type SessionStatus = 'checking' | 'locked' | 'active';
 
 const Play2048 = () => {
   const { grid, score, gameOver, won, moveCount, move, resetGame } = use2048();
+  const queryClient = useQueryClient();
+  const submittedRef = useRef(false);
 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -205,6 +208,7 @@ const Play2048 = () => {
 
   const handlePlayAgain = useCallback(() => {
     setScoreSaved(false);
+    submittedRef.current = false;
     setSessionStatus('locked');
     setSessionId(null);
     if (walletAddress) setShowPayment(true);
@@ -214,23 +218,30 @@ const Play2048 = () => {
   const prevScoreRef = useRef(score);
 
   const handleGameEnd = useCallback(async () => {
-    if (sessionId && walletAddress) {
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true }),
-        });
-        if (res.ok) {
-          setScoreSaved(true);
-          toast.success('Score saved to leaderboard!');
-        } else {
-          toast.error('Failed to save score');
-        }
-      } catch (error) { console.error('Failed to save score:', error); }
-      setSessionStatus('locked');
+    if (!sessionId || !walletAddress || submittedRef.current) return;
+    submittedRef.current = true;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score, end_game: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setScoreSaved(true);
+        toast.success('Score saved to leaderboard');
+        queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      } else {
+        submittedRef.current = false;
+        toast.error(data?.error || 'Failed to save score');
+      }
+    } catch (error) {
+      submittedRef.current = false;
+      console.error('Failed to save score:', error);
+      toast.error('Failed to save score');
     }
-  }, [sessionId, walletAddress, score]);
+    setSessionStatus('locked');
+  }, [sessionId, walletAddress, score, queryClient]);
 
   useEffect(() => {
     if (sessionId && walletAddress && hasActiveSession && score > prevScoreRef.current + 500) {
