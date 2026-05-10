@@ -345,7 +345,7 @@ const PlayTetris = () => {
         </div>
       </main>
 
-      <GameOverModal isOpen={gameOver} score={score} won={false} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} scoreSaved={scoreSaved} />
+      <GameOverModal isOpen={gameOver} score={score} won={false} onPlayAgain={handlePlayAgain} onClose={handlePlayAgain} scoreSaved={scoreSaved} lines={lines} level={level} />
       <PaymentModal isOpen={showPayment} onClose={() => setShowPayment(false)} onPay={startNewGame}
         feeETH={isCreator ? CREATOR_FEE_ETH : dynamicEthFee ?? '0.00040000'} feeUSDC={GAME_FEE_USDC}
         balanceETH={balanceETH} balanceUSDC={balanceUSDC} isLoading={isProcessing}

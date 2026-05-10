@@ -86,7 +86,8 @@ export const useTetris = () => {
 
   const spawnPiece = useCallback(() => {
     const p = randomPiece();
-    const startPos = { x: Math.floor((BOARD_WIDTH - p.shape[0].length) / 2), y: -p.shape.length };
+    // Spawn at top visible row (y=0) so collision detection works against existing blocks.
+    const startPos = { x: Math.floor((BOARD_WIDTH - p.shape[0].length) / 2), y: 0 };
     pieceRef.current = p;
     posRef.current = startPos;
     return { piece: p, pos: startPos };

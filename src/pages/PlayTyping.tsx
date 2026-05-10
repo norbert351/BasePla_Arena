@@ -188,7 +188,8 @@ const PlayTyping = () => {
   const isPlayBlocked = needsWalletConnection || isCheckingSession || !!needsPayment;
   const inputStatus = getInputStatus();
 
-  const timerPercent = (timeLeft / 30) * 100;
+  const timerPercent = (timeLeft / 120) * 100;
+  const timerDisplay = `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/30">
@@ -228,7 +229,7 @@ const PlayTyping = () => {
             </div>
             <div className="bg-card rounded-lg p-3 border border-border text-center">
               <p className="text-xs text-muted-foreground">Time</p>
-              <p className={`text-xl font-bold ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-foreground'}`}>{timeLeft}s</p>
+              <p className={`text-xl font-bold ${timeLeft <= 10 ? 'text-red-400 animate-pulse' : 'text-foreground'}`}>{timerDisplay}</p>
             </div>
           </div>
 
@@ -275,7 +276,7 @@ const PlayTyping = () => {
               <div className="text-center space-y-4">
                 <Keyboard className="h-16 w-16 text-primary mx-auto" />
                 <h2 className="text-2xl font-bold">Speed Typing Arena</h2>
-                <p className="text-muted-foreground text-sm">Type as fast as you can in 30 seconds!</p>
+                <p className="text-muted-foreground text-sm">Type as fast as you can in 2 minutes!</p>
                 <div className="flex gap-2 justify-center">
                   <Button
                     variant={selectedMode === 'normal' ? 'default' : 'outline'}
