@@ -1,4 +1,6 @@
 import { createPublicClient, createWalletClient, custom, http, parseEther, parseUnits, formatEther, formatUnits, type Address, type Hex } from 'viem';
+import { getConnections, sendTransaction } from '@wagmi/core';
+import { wagmiConfig } from '@/lib/wagmi';
 import { base } from 'viem/chains';
 
 // Base mainnet USDC contract address
@@ -47,6 +49,21 @@ type Eip1193Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
+const getConnectedWalletProvider = async (expected?: Address): Promise<Eip1193Provider> => {
+  const connection = getConnections(wagmiConfig).find(
+    (item) => !expected || item.accounts.some((account) => account.toLowerCase() === expected.toLowerCase())
+  );
+
+  if (connection?.connector?.getProvider) {
+    const provider = await connection.connector.getProvider({ chainId: base.id });
+    if (provider && typeof (provider as Eip1193Provider).request === 'function') {
+      return provider as Eip1193Provider;
+    }
+  }
+
+  return getEip1193Provider();
+};
+
 const getEip1193Provider = (): Eip1193Provider => {
   if (typeof window === 'undefined' || !(window as any).ethereum?.request) {
     throw new Error('No wallet found');
@@ -60,7 +77,7 @@ const getEip1193Provider = (): Eip1193Provider => {
  * with the wallet’s active account, producing “not authorized” errors.
  */
 const ensureAuthorizedAccount = async (expected?: Address): Promise<Address> => {
-  const provider = getEip1193Provider();
+  const provider = await getConnectedWalletProvider(expected);
 
   let accounts = (await provider.request({ method: 'eth_accounts' })) as unknown;
   if (!Array.isArray(accounts) || accounts.length === 0) {
@@ -117,17 +134,17 @@ export const sendETHPayment = async (fromAddress: Address, amount: string): Prom
   const from = await ensureAuthorizedAccount(fromAddress);
 
   try {
-    // EIP-1193 providers return a single tx hash string for eth_sendTransaction.
-    const txHash = (await window.ethereum.request({
-      method: 'eth_sendTransaction',
-      params: [
-        {
-          from,
-          to: FEE_COLLECTION_ADDRESS,
-          value: `0x${parseEther(amount).toString(16)}`,
-        },
-      ],
-    })) as unknown;
+    const connector = getConnections(wagmiConfig).find(
+      (connection) => connection.accounts.some((account) => account.toLowerCase() === from.toLowerCase())
+    )?.connector;
+
+    const txHash = await sendTransaction(wagmiConfig, {
+      account: from,
+      chainId: base.id,
+      connector,
+      to: FEE_COLLECTION_ADDRESS,
+      value: parseEther(amount),
+    });
 
     if (typeof txHash !== 'string' || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
       // Prevent viem from calling RPC methods with an invalid hash (e.g. "0")
@@ -163,16 +180,17 @@ export const sendUSDCPayment = async (fromAddress: Address, amount: string): Pro
     .padStart(64, '0')}` as Hex;
 
   try {
-    const txHash = (await window.ethereum.request({
-      method: 'eth_sendTransaction',
-      params: [
-        {
-          from,
-          to: USDC_ADDRESS,
-          data: transferData,
-        },
-      ],
-    })) as unknown;
+    const connector = getConnections(wagmiConfig).find(
+      (connection) => connection.accounts.some((account) => account.toLowerCase() === from.toLowerCase())
+    )?.connector;
+
+    const txHash = await sendTransaction(wagmiConfig, {
+      account: from,
+      chainId: base.id,
+      connector,
+      to: USDC_ADDRESS,
+      data: transferData,
+    });
 
     if (typeof txHash !== 'string' || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
       throw new Error('Transaction was cancelled or did not return a valid hash');
@@ -193,10 +211,12 @@ export const sendUSDCPayment = async (fromAddress: Address, amount: string): Pro
 export const switchToBaseNetwork = async (): Promise<void> => {
   if (!window.ethereum) throw new Error('No wallet found');
 
+  const provider = await getConnectedWalletProvider();
+
   // Check current chain first — many smart wallets (Coinbase Smart Wallet) are
   // permanently on Base and reject `wallet_switchEthereumChain` calls.
   try {
-    const currentChainId = (await window.ethereum.request({ method: 'eth_chainId' })) as string;
+    const currentChainId = (await provider.request({ method: 'eth_chainId' })) as string;
     if (typeof currentChainId === 'string' && currentChainId.toLowerCase() === '0x2105') {
       return; // Already on Base
     }
@@ -205,14 +225,14 @@ export const switchToBaseNetwork = async (): Promise<void> => {
   }
 
   try {
-    await window.ethereum.request({
+    await provider.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: '0x2105' }],
     });
   } catch (error: any) {
     if (error?.code === 4902) {
       try {
-        await window.ethereum.request({
+        await provider.request({
           method: 'wallet_addEthereumChain',
           params: [{
             chainId: '0x2105',
