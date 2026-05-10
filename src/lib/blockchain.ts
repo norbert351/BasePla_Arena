@@ -192,28 +192,48 @@ export const sendUSDCPayment = async (fromAddress: Address, amount: string): Pro
 
 export const switchToBaseNetwork = async (): Promise<void> => {
   if (!window.ethereum) throw new Error('No wallet found');
-  
+
+  // Check current chain first — many smart wallets (Coinbase Smart Wallet) are
+  // permanently on Base and reject `wallet_switchEthereumChain` calls.
+  try {
+    const currentChainId = (await window.ethereum.request({ method: 'eth_chainId' })) as string;
+    if (typeof currentChainId === 'string' && currentChainId.toLowerCase() === '0x2105') {
+      return; // Already on Base
+    }
+  } catch {
+    // If we can't read the chain, fall through and try to switch.
+  }
+
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
-      params: [{ chainId: '0x2105' }], // Base mainnet chain ID
+      params: [{ chainId: '0x2105' }],
     });
   } catch (error: any) {
-    // If the chain is not added, add it
-    if (error.code === 4902) {
-      await window.ethereum.request({
-        method: 'wallet_addEthereumChain',
-        params: [{
-          chainId: '0x2105',
-          chainName: 'Base',
-          nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-          rpcUrls: ['https://mainnet.base.org'],
-          blockExplorerUrls: ['https://basescan.org'],
-        }],
-      });
-    } else {
-      throw error;
+    if (error?.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0x2105',
+            chainName: 'Base',
+            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://mainnet.base.org'],
+            blockExplorerUrls: ['https://basescan.org'],
+          }],
+        });
+      } catch (addErr) {
+        console.warn('Failed to add Base network, continuing anyway:', addErr);
+      }
+      return;
     }
+    // User rejected — surface that
+    if (error?.code === 4001) {
+      throw new Error('User rejected network switch');
+    }
+    // Some wallets (Coinbase Smart Wallet) don't support switching — they're already on Base.
+    // Don't block the payment flow.
+    console.warn('Network switch unsupported, continuing:', error?.message || error);
   }
 };
 
