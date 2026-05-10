@@ -49,6 +49,21 @@ type Eip1193Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
+const getConnectedWalletProvider = async (expected?: Address): Promise<Eip1193Provider> => {
+  const connection = getConnections(wagmiConfig).find(
+    (item) => !expected || item.accounts.some((account) => account.toLowerCase() === expected.toLowerCase())
+  );
+
+  if (connection?.connector?.getProvider) {
+    const provider = await connection.connector.getProvider({ chainId: base.id });
+    if (provider && typeof (provider as Eip1193Provider).request === 'function') {
+      return provider as Eip1193Provider;
+    }
+  }
+
+  return getEip1193Provider();
+};
+
 const getEip1193Provider = (): Eip1193Provider => {
   if (typeof window === 'undefined' || !(window as any).ethereum?.request) {
     throw new Error('No wallet found');
@@ -62,7 +77,7 @@ const getEip1193Provider = (): Eip1193Provider => {
  * with the wallet’s active account, producing “not authorized” errors.
  */
 const ensureAuthorizedAccount = async (expected?: Address): Promise<Address> => {
-  const provider = getEip1193Provider();
+  const provider = await getConnectedWalletProvider(expected);
 
   let accounts = (await provider.request({ method: 'eth_accounts' })) as unknown;
   if (!Array.isArray(accounts) || accounts.length === 0) {
@@ -196,10 +211,12 @@ export const sendUSDCPayment = async (fromAddress: Address, amount: string): Pro
 export const switchToBaseNetwork = async (): Promise<void> => {
   if (!window.ethereum) throw new Error('No wallet found');
 
+  const provider = await getConnectedWalletProvider();
+
   // Check current chain first — many smart wallets (Coinbase Smart Wallet) are
   // permanently on Base and reject `wallet_switchEthereumChain` calls.
   try {
-    const currentChainId = (await window.ethereum.request({ method: 'eth_chainId' })) as string;
+    const currentChainId = (await provider.request({ method: 'eth_chainId' })) as string;
     if (typeof currentChainId === 'string' && currentChainId.toLowerCase() === '0x2105') {
       return; // Already on Base
     }
@@ -208,14 +225,14 @@ export const switchToBaseNetwork = async (): Promise<void> => {
   }
 
   try {
-    await window.ethereum.request({
+    await provider.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: '0x2105' }],
     });
   } catch (error: any) {
     if (error?.code === 4902) {
       try {
-        await window.ethereum.request({
+        await provider.request({
           method: 'wallet_addEthereumChain',
           params: [{
             chainId: '0x2105',
