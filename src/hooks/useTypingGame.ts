@@ -38,7 +38,7 @@ const NORMAL_WORDS = [...EASY_WORDS, ...MEDIUM_WORDS, ...HARD_WORDS];
 export type WordMode = 'normal' | 'crypto';
 export type GamePhase = 'idle' | 'countdown' | 'playing' | 'finished';
 
-const GAME_DURATION = 30; // seconds
+const GAME_DURATION = 120; // seconds (2 minutes)
 const COUNTDOWN_SECONDS = 3;
 
 function pickWord(mode: WordMode): string {
