@@ -1,4 +1,6 @@
 import { createPublicClient, createWalletClient, custom, http, parseEther, parseUnits, formatEther, formatUnits, type Address, type Hex } from 'viem';
+import { getConnections, sendTransaction } from '@wagmi/core';
+import { wagmiConfig } from '@/lib/wagmi';
 import { base } from 'viem/chains';
 
 // Base mainnet USDC contract address
@@ -117,17 +119,17 @@ export const sendETHPayment = async (fromAddress: Address, amount: string): Prom
   const from = await ensureAuthorizedAccount(fromAddress);
 
   try {
-    // EIP-1193 providers return a single tx hash string for eth_sendTransaction.
-    const txHash = (await window.ethereum.request({
-      method: 'eth_sendTransaction',
-      params: [
-        {
-          from,
-          to: FEE_COLLECTION_ADDRESS,
-          value: `0x${parseEther(amount).toString(16)}`,
-        },
-      ],
-    })) as unknown;
+    const connector = getConnections(wagmiConfig).find(
+      (connection) => connection.accounts.some((account) => account.toLowerCase() === from.toLowerCase())
+    )?.connector;
+
+    const txHash = await sendTransaction(wagmiConfig, {
+      account: from,
+      chainId: base.id,
+      connector,
+      to: FEE_COLLECTION_ADDRESS,
+      value: parseEther(amount),
+    });
 
     if (typeof txHash !== 'string' || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
       // Prevent viem from calling RPC methods with an invalid hash (e.g. "0")
@@ -163,16 +165,17 @@ export const sendUSDCPayment = async (fromAddress: Address, amount: string): Pro
     .padStart(64, '0')}` as Hex;
 
   try {
-    const txHash = (await window.ethereum.request({
-      method: 'eth_sendTransaction',
-      params: [
-        {
-          from,
-          to: USDC_ADDRESS,
-          data: transferData,
-        },
-      ],
-    })) as unknown;
+    const connector = getConnections(wagmiConfig).find(
+      (connection) => connection.accounts.some((account) => account.toLowerCase() === from.toLowerCase())
+    )?.connector;
+
+    const txHash = await sendTransaction(wagmiConfig, {
+      account: from,
+      chainId: base.id,
+      connector,
+      to: USDC_ADDRESS,
+      data: transferData,
+    });
 
     if (typeof txHash !== 'string' || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
       throw new Error('Transaction was cancelled or did not return a valid hash');
