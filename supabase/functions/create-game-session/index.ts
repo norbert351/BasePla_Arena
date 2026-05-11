@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
       .eq("is_active", true);
 
     // Create game session with tx_hash for verification
-    const validGameType = ['2048', 'tetris'].includes(game_type) ? game_type : '2048';
+    const validGameType = ['2048', 'tetris', 'typing'].includes(game_type) ? game_type : '2048';
 
     const { data: session, error: sessionError } = await supabase
       .from("game_sessions")

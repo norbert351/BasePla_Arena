@@ -166,11 +166,13 @@ const PlayTyping = () => {
   useEffect(() => {
     if (phase !== 'finished' || !sessionId || !walletAddress || submittedRef.current) return;
     submittedRef.current = true;
+    console.info('[typing] submitting score', { wpm, accuracy, finalScore, streak: bestStreak });
     fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score: finalScore, end_game: true }),
+      body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score: finalScore, wpm, accuracy, end_game: true }),
     }).then(async (res) => {
       const data = await res.json().catch(() => ({}));
+      console.info('[typing] save result', { ok: res.ok, data });
       if (res.ok) {
         setScoreSaved(true);
         toast.success('Score saved to leaderboard');

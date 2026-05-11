@@ -27,10 +27,15 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { session_id, wallet_address, score, end_game } = await req.json();
+    const { session_id, wallet_address, score, end_game, wpm, accuracy } = await req.json();
 
     if (!session_id || !wallet_address || score === undefined) {
       return json({ error: "Missing required fields" }, 400);
+    }
+    if (wpm !== undefined || accuracy !== undefined) {
+      console.info("[update-game-score] typing stats", {
+        session_id, wpm, accuracy, final_score: score,
+      });
     }
     if (!/^0x[a-fA-F0-9]{40}$/.test(wallet_address)) {
       return json({ error: "Invalid wallet address format" }, 400);
