@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Trophy, Medal, Award, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,8 +23,10 @@ export interface LeaderboardPlayer {
 }
 
 export const Leaderboard = () => {
+  const queryClient = useQueryClient();
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('leaderboard')
@@ -79,6 +82,17 @@ export const Leaderboard = () => {
       return sorted;
     },
   });
+
+  // Realtime: refresh whenever the leaderboard table changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('leaderboard-home-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const shortenWallet = (wallet: string) => {
     return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;

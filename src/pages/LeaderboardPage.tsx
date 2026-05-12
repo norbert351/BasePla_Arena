@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { LeaderboardEntry } from '@/components/leaderboard/LeaderboardEntry';
 import { Trophy, Loader2, ArrowLeft } from 'lucide-react';
@@ -15,9 +16,11 @@ const shortenWallet = (wallet: string) => `${wallet.slice(0, 6)}...${wallet.slic
 
 const LeaderboardPage = () => {
   const { gameType = '2048' } = useParams<{ gameType: string }>();
+  const queryClient = useQueryClient();
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['leaderboard', gameType],
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await (supabase
         .from('leaderboard')
@@ -51,6 +54,17 @@ const LeaderboardPage = () => {
         }));
     },
   });
+
+  // Realtime: refresh whenever the leaderboard table changes
+  useEffect(() => {
+    const channel = supabase
+      .channel(`leaderboard-page-rt-${gameType}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['leaderboard', gameType] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [gameType, queryClient]);
 
   const title = gameType === 'tetris' ? 'Tetris' : gameType === 'typing' ? 'Speed Typing' : '2048';
 
