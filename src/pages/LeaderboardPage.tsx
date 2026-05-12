@@ -16,9 +16,11 @@ const shortenWallet = (wallet: string) => `${wallet.slice(0, 6)}...${wallet.slic
 
 const LeaderboardPage = () => {
   const { gameType = '2048' } = useParams<{ gameType: string }>();
+  const queryClient = useQueryClient();
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['leaderboard', gameType],
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await (supabase
         .from('leaderboard')
