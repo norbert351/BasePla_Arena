@@ -162,14 +162,21 @@ const PlayTyping = () => {
     if (walletAddress) setShowPayment(true);
   }, [walletAddress, resetGame]);
 
-  // End game session when game finishes
+  // End game session when game finishes (wait for finalScore to be computed)
   useEffect(() => {
     if (phase !== 'finished' || !sessionId || !walletAddress || submittedRef.current) return;
+    // Wait until the score has been calculated by the hook's effect
+    if (finalScore <= 0 && correctWords === 0 && totalAttempts === 0) return;
     submittedRef.current = true;
-    console.info('[typing] submitting score', { wpm, accuracy, finalScore, streak: bestStreak });
+    console.info('[typing] submitting score', {
+      wallet: walletAddress, wpm, accuracy, bestStreak, finalScore, correctWords, totalAttempts,
+    });
     fetch(`${SUPABASE_URL}/functions/v1/update-game-score`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId, wallet_address: walletAddress, score: finalScore, wpm, accuracy, end_game: true }),
+      body: JSON.stringify({
+        session_id: sessionId, wallet_address: walletAddress,
+        score: finalScore, wpm, accuracy, best_streak: bestStreak, end_game: true,
+      }),
     }).then(async (res) => {
       const data = await res.json().catch(() => ({}));
       console.info('[typing] save result', { ok: res.ok, data });
@@ -183,7 +190,7 @@ const PlayTyping = () => {
       }
     }).catch((e) => { submittedRef.current = false; console.error(e); toast.error('Failed to save score'); });
     setSessionStatus('locked');
-  }, [phase, sessionId, walletAddress, finalScore, queryClient]);
+  }, [phase, sessionId, walletAddress, finalScore, wpm, accuracy, bestStreak, correctWords, totalAttempts, queryClient]);
 
   const needsWalletConnection = !walletAddress;
   const needsPayment = walletAddress && sessionStatus === 'locked';
