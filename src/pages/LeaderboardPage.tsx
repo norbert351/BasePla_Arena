@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { LeaderboardEntry } from '@/components/leaderboard/LeaderboardEntry';
 import { Trophy, Loader2, ArrowLeft } from 'lucide-react';
