@@ -55,6 +55,17 @@ const LeaderboardPage = () => {
     },
   });
 
+  // Realtime: refresh whenever the leaderboard table changes
+  useEffect(() => {
+    const channel = supabase
+      .channel(`leaderboard-page-rt-${gameType}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['leaderboard', gameType] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [gameType, queryClient]);
+
   const title = gameType === 'tetris' ? 'Tetris' : gameType === 'typing' ? 'Speed Typing' : '2048';
 
   return (
