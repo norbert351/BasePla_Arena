@@ -83,6 +83,17 @@ export const Leaderboard = () => {
     },
   });
 
+  // Realtime: refresh whenever the leaderboard table changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('leaderboard-home-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
   const shortenWallet = (wallet: string) => {
     return `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
   };
