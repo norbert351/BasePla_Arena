@@ -159,9 +159,14 @@ export function useTypingGame() {
       const finalAcc = totalAttempts > 0 ? Math.round((correctWords / totalAttempts) * 100) : 0;
       setWpm(finalWpm);
       setAccuracy(finalAcc);
-      setFinalScore(Math.round(finalWpm * (finalAcc / 100)));
+      // New scoring formula: rewards speed, accuracy, and consistency
+      const score =
+        Math.floor(finalWpm * 10) +
+        Math.floor(finalAcc * 2) +
+        Math.floor(bestStreak * 3);
+      setFinalScore(Math.max(0, score));
     }
-  }, [phase, correctWords, totalAttempts]);
+  }, [phase, correctWords, totalAttempts, bestStreak]);
 
   // Cleanup on unmount
   useEffect(() => () => clearTimer(), [clearTimer]);

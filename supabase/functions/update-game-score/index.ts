@@ -15,7 +15,7 @@ const json = (body: unknown, status = 200) =>
 const MAX_SESSION_SCORE: Record<string, number> = {
   "2048": 200000,
   tetris: 500000,
-  typing: 5000,
+  typing: 50000,
 };
 
 Deno.serve(async (req) => {
@@ -27,14 +27,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { session_id, wallet_address, score, end_game, wpm, accuracy } = await req.json();
+    const { session_id, wallet_address, score, end_game, wpm, accuracy, best_streak } = await req.json();
 
     if (!session_id || !wallet_address || score === undefined) {
       return json({ error: "Missing required fields" }, 400);
     }
-    if (wpm !== undefined || accuracy !== undefined) {
+    if (wpm !== undefined || accuracy !== undefined || best_streak !== undefined) {
       console.info("[update-game-score] typing stats", {
-        session_id, wpm, accuracy, final_score: score,
+        session_id, wallet_address, wpm, accuracy, best_streak, final_score: score,
       });
     }
     if (!/^0x[a-fA-F0-9]{40}$/.test(wallet_address)) {
