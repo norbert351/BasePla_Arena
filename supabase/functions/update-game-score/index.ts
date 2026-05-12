@@ -15,7 +15,7 @@ const json = (body: unknown, status = 200) =>
 const MAX_SESSION_SCORE: Record<string, number> = {
   "2048": 200000,
   tetris: 500000,
-  typing: 5000,
+  typing: 50000,
 };
 
 Deno.serve(async (req) => {
