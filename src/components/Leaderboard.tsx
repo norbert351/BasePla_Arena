@@ -23,8 +23,10 @@ export interface LeaderboardPlayer {
 }
 
 export const Leaderboard = () => {
+  const queryClient = useQueryClient();
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('leaderboard')
